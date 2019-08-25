@@ -7,7 +7,7 @@ from bleak import BleakClient
 
 logging.basicConfig(level=logging.DEBUG)
 
-DEVICE_ADDRESS = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
+DEVICE_UUID = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
 DEVICE_MAC = "6C:B7:49:XX:XX:XX"
 
 CHARACTERISTICS = {
@@ -49,4 +49,4 @@ async def read_data(address, loop):
 
 
 loop = asyncio.get_event_loop()
-loop.run_until_complete(read_data(DEVICE_MAC if platform.system() != "Darwin" else DEVICE_ADDRESS, loop))
+loop.run_until_complete(read_data(DEVICE_MAC if platform.system() != "Darwin" else DEVICE_UUID, loop))

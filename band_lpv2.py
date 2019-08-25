@@ -12,7 +12,7 @@ from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LEN
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("lpv2")
 
-DEVICE_ADDRESS = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
+DEVICE_UUID = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
 DEVICE_MAC = b"6C:B7:49:XX:XX:XX"
 
 GATT_WRITE = "0000fe01-0000-1000-8000-00805f9b34fb"
@@ -230,5 +230,5 @@ class Band:
 
 
 event_loop = asyncio.get_event_loop()
-band = Band(address=DEVICE_MAC if platform.system() != "Darwin" else DEVICE_ADDRESS, loop=event_loop)
+band = Band(address=DEVICE_MAC if platform.system() != "Darwin" else DEVICE_UUID, loop=event_loop)
 event_loop.run_until_complete(band.connect())
