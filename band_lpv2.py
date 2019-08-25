@@ -1,6 +1,7 @@
 import asyncio
 import enum
 import logging
+import platform
 
 from bleak import BleakClient
 

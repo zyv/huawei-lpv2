@@ -1,7 +1,7 @@
 import asyncio
 import logging
-import struct
 import platform
+import struct
 
 from bleak import BleakClient
 
