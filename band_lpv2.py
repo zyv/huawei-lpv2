@@ -230,5 +230,5 @@ class Band:
 
 
 event_loop = asyncio.get_event_loop()
-band = Band(address=DEVICE_ADDRESS, loop=event_loop)
+band = Band(address=DEVICE_MAC if platform.system() != "Darwin" else DEVICE_ADDRESS, loop=event_loop)
 event_loop.run_until_complete(band.connect())
