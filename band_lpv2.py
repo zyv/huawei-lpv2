@@ -18,8 +18,6 @@ DEVICE_MAC = b"6C:B7:49:XX:XX:XX"
 GATT_WRITE = "0000fe01-0000-1000-8000-00805f9b34fb"
 GATT_READ = "0000fe02-0000-1000-8000-00805f9b34fb"
 
-WAIT_DELAY = 0.01
-
 
 class BandState(enum.Enum):
     Disconnected = enum.auto()
@@ -56,9 +54,22 @@ class Band:
         self.bt_version = None
         self.encryption_counter = None
 
-    def send_data(self, client: BleakClient, packet: Packet):
+        self._event = asyncio.Event()
+
+    async def wait_for_state(self, state: BandState):
+        logger.debug(f"Waiting for state: {state}...")
+        await self._event.wait()
+        if self.state != state:
+            raise RuntimeError(f"bad state: {self.state} != {state}")
+        logger.debug(f"Response received, state {state} attained!")
+
+    def send_data(self, client: BleakClient, packet: Packet, requires_response: bool = True):
         data = bytes(packet)
         logger.debug(f"State: {self.state}, sending: {hexlify(data)}")
+
+        if requires_response:
+            self._event.clear()
+
         return client.write_gatt_char(GATT_WRITE, data)
 
     def receive_data(self, sender, data):
@@ -81,6 +92,8 @@ class Band:
         elif self.state == BandState.RequestedBond:
             pass  # TODO: bonding
 
+        self._event.set()
+
     async def connect(self):
         is_connected = await self.client.is_connected()
 
@@ -95,26 +108,21 @@ class Band:
 
         await self.send_data(self.client, self.request_link_params())
 
-        while self.state != BandState.ReceivedLinkParams:
-            logger.debug("Waiting for response...")
-            await asyncio.sleep(WAIT_DELAY, loop=self.loop)
+        await self.wait_for_state(BandState.ReceivedLinkParams)
 
         await self.send_data(self.client, self.request_authentication())
 
-        while self.state != BandState.ReceivedAuthentication:
-            logger.debug("Waiting for response...")
-            await asyncio.sleep(WAIT_DELAY, loop=self.loop)
+        await self.wait_for_state(BandState.ReceivedAuthentication)
 
         await self.send_data(self.client, self.request_bond_params())
 
-        while self.state != BandState.ReceivedBondParams:
-            logger.debug("Waiting for response...")
-            await asyncio.sleep(WAIT_DELAY, loop=self.loop)
+        await self.wait_for_state(BandState.ReceivedBondParams)
 
         # TODO: bonding
 
     async def disconnect(self):
         await self.client.stop_notify(GATT_READ)
+        self.state = BandState.Disconnected
 
     def request_link_params(self) -> Packet:
         self.state = BandState.RequestedLinkParams
