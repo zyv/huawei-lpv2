@@ -103,6 +103,9 @@ class Command:
     def __eq__(self, other: "Command"):
         return self.tlvs == other.tlvs
 
+    def __contains__(self, tag: int):
+        return any(item.tag == tag for item in self.tlvs)
+
     def __getitem__(self, tag: int):
         return next(filter(lambda item: item.tag == tag, self.tlvs))
 

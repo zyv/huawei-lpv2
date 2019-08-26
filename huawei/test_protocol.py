@@ -49,7 +49,7 @@ class TestTLV(unittest.TestCase):
 
 
 class TestCommand(unittest.TestCase):
-    DATA = "5A 00 0B 00 01 01 01 00 02 00 03 00 04 00 F1 3B"
+    DATA = "01 00 02 00 03 00 04 00"
 
     def test_serialization(self):
         cmd1, cmd2 = Command(), Command(tlvs=[TLV(tag=1, value=b"abc"), TLV(tag=2, value=b"cde")])
@@ -59,13 +59,18 @@ class TestCommand(unittest.TestCase):
         self.assertEqual(cmd2[2], TLV(tag=2, value=b"cde"))
 
     def test_deserialization(self):
-        cmd = Command.from_bytes(bytes.fromhex(self.DATA)[6:-2])
+        cmd = Command.from_bytes(bytes.fromhex(self.DATA))
 
         self.assertEqual(4, len(cmd.tlvs))
         self.assertEqual([1, 2, 3, 4], [tlv.tag for tlv in cmd.tlvs])
         self.assertEqual([b""] * 4, [tlv.value for tlv in cmd.tlvs])
 
         self.assertEqual(cmd[3], TLV(tag=3, value=b""))
+
+    def test_contains(self):
+        cmd = Command.from_bytes(bytes.fromhex(self.DATA))
+        self.assertTrue(all(tag in cmd for tag in [1, 2, 3, 4]))
+        self.assertFalse(5 in cmd)
 
 
 class TestPacket(unittest.TestCase):
