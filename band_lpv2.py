@@ -35,8 +35,9 @@ class BandState(enum.Enum):
 
 
 class Band:
-    def __init__(self, address, loop):
-        self.address = address
+    def __init__(self, client: BleakClient, mac_address, loop):
+        self.client = client
+        self.mac_address = mac_address
         self.loop = loop
 
         self.state = BandState.Disconnected
@@ -81,39 +82,39 @@ class Band:
             pass  # TODO: bonding
 
     async def connect(self):
-        async with BleakClient(self.address, loop=self.loop) as client:
-            is_connected = await client.is_connected()
+        is_connected = await self.client.is_connected()
 
-            if not is_connected:
-                raise RuntimeError("device connection failed")
+        if not is_connected:
+            raise RuntimeError("device connection failed")
 
-            self.state = BandState.Connected
+        self.state = BandState.Connected
 
-            logger.info(f"State: {self.state}")
+        logger.info(f"State: {self.state}")
 
-            await client.start_notify(GATT_READ, self.receive_data)
+        await self.client.start_notify(GATT_READ, self.receive_data)
 
-            await self.send_data(client, self.request_link_params())
+        await self.send_data(self.client, self.request_link_params())
 
-            while self.state != BandState.ReceivedLinkParams:
-                logger.debug("Waiting for response...")
-                await asyncio.sleep(WAIT_DELAY, loop=self.loop)
+        while self.state != BandState.ReceivedLinkParams:
+            logger.debug("Waiting for response...")
+            await asyncio.sleep(WAIT_DELAY, loop=self.loop)
 
-            await self.send_data(client, self.request_authentication())
+        await self.send_data(self.client, self.request_authentication())
 
-            while self.state != BandState.ReceivedAuthentication:
-                logger.debug("Waiting for response...")
-                await asyncio.sleep(WAIT_DELAY, loop=self.loop)
+        while self.state != BandState.ReceivedAuthentication:
+            logger.debug("Waiting for response...")
+            await asyncio.sleep(WAIT_DELAY, loop=self.loop)
 
-            await self.send_data(client, self.request_bond_params())
+        await self.send_data(self.client, self.request_bond_params())
 
-            while self.state != BandState.ReceivedBondParams:
-                logger.debug("Waiting for response...")
-                await asyncio.sleep(WAIT_DELAY, loop=self.loop)
+        while self.state != BandState.ReceivedBondParams:
+            logger.debug("Waiting for response...")
+            await asyncio.sleep(WAIT_DELAY, loop=self.loop)
 
-            # TODO: bonding
+        # TODO: bonding
 
-            await client.stop_notify(GATT_READ)
+    async def disconnect(self):
+        await self.client.stop_notify(GATT_READ)
 
     def request_link_params(self) -> Packet:
         self.state = BandState.RequestedLinkParams
@@ -192,7 +193,7 @@ class Band:
                 TLV(tag=DeviceConfig.BondParams.Tags.Serial, value=b"X" * 6),
                 TLV(tag=DeviceConfig.BondParams.Tags.BTVersion, value=b"\x02"),
                 TLV(tag=DeviceConfig.BondParams.Tags.MaxFrameSize),
-                TLV(tag=DeviceConfig.BondParams.Tags.MacAddress, value=DEVICE_MAC),
+                TLV(tag=DeviceConfig.BondParams.Tags.MacAddress, value=self.mac_address.encode()),
                 TLV(tag=DeviceConfig.BondParams.Tags.EncryptionCounter)
             ])
         )
@@ -229,6 +230,12 @@ class Band:
         self.state = BandState.ReceivedBond
 
 
+async def run(loop):
+    async with BleakClient(DEVICE_MAC if platform.system() != "Darwin" else DEVICE_UUID, loop=loop) as client:
+        band = Band(client=client, mac_address=DEVICE_MAC, loop=loop)
+        await band.connect()
+        await band.disconnect()
+
+
 event_loop = asyncio.get_event_loop()
-band = Band(address=DEVICE_MAC if platform.system() != "Darwin" else DEVICE_UUID, loop=event_loop)
-event_loop.run_until_complete(band.connect())
+event_loop.run_until_complete(run(event_loop))
