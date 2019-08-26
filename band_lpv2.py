@@ -7,16 +7,20 @@ from bleak import BleakClient
 
 from huawei.services import DeviceConfig
 from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LENGTH, AUTH_VERSION, PROTOCOL_VERSION, \
-    encode_int, digest_challenge, digest_response
+    encode_int, digest_challenge, digest_response, create_bond_key
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("lpv2")
 
 DEVICE_UUID = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
-DEVICE_MAC = b"6C:B7:49:XX:XX:XX"
+DEVICE_MAC = "6C:B7:49:XX:XX:XX"
+
+CLIENT_MAC = "C4:B3:01:XX:XX:XX"
 
 GATT_WRITE = "0000fe01-0000-1000-8000-00805f9b34fb"
 GATT_READ = "0000fe02-0000-1000-8000-00805f9b34fb"
+
+CLIENT_SERIAL = b"X" * 6  # android.os.Build.SERIAL
 
 
 class BandState(enum.Enum):
@@ -138,6 +142,9 @@ class Band:
         )
 
     def parse_link_params(self, command: Command):
+        if DeviceConfig.LinkParams.Tags.Error in command:
+            raise RuntimeError("link parameter negotiation failed")
+
         self.protocol_version = decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)
         self.max_frame_size = decode_int(command[DeviceConfig.LinkParams.Tags.MaxFrameSize].value)
         self.max_link_size = decode_int(command[DeviceConfig.LinkParams.Tags.MaxLinkSize].value)
@@ -145,6 +152,8 @@ class Band:
 
         self.auth_version = decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])
         self.server_nonce = bytes(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[2:18])
+
+        # TODO: optional path extend number parsing
 
         if self.protocol_version != PROTOCOL_VERSION:
             raise RuntimeError(f"protocol version mismatch: {self.protocol_version} != {PROTOCOL_VERSION}")
@@ -198,10 +207,10 @@ class Band:
             command_id=DeviceConfig.BondParams.id,
             command=Command(tlvs=[
                 TLV(tag=DeviceConfig.BondParams.Tags.Status),
-                TLV(tag=DeviceConfig.BondParams.Tags.Serial, value=b"X" * 6),
+                TLV(tag=DeviceConfig.BondParams.Tags.Serial, value=CLIENT_SERIAL),
                 TLV(tag=DeviceConfig.BondParams.Tags.BTVersion, value=b"\x02"),
                 TLV(tag=DeviceConfig.BondParams.Tags.MaxFrameSize),
-                TLV(tag=DeviceConfig.BondParams.Tags.MacAddress, value=self.mac_address.encode()),
+                TLV(tag=DeviceConfig.BondParams.Tags.ClientMacAddress, value=CLIENT_MAC.encode()),
                 TLV(tag=DeviceConfig.BondParams.Tags.EncryptionCounter)
             ])
         )
@@ -211,6 +220,9 @@ class Band:
         return packet
 
     def parse_bond_params(self, command: Command):
+        if DeviceConfig.BondParams.Tags.Error in command:
+            raise RuntimeError("bond parameter negotiation failed")
+
         self.bond_status = decode_int(command[DeviceConfig.BondParams.Tags.Status].value)
         self.bond_status_info = decode_int(command[DeviceConfig.BondParams.Tags.StatusInfo].value)
         self.bt_version = decode_int(command[DeviceConfig.BondParams.Tags.BTVersion].value)
