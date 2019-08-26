@@ -10,6 +10,24 @@ class DeviceConfig:
             MaxLinkSize = 3
             ConnectionInterval = 4
             ServerNonce = 5
+            PathExtendNumber = 6  # apparently used for BTVersion == 0
+            Error = 127
+
+    class ProductType:
+        id = 7
+
+        class Tags:
+            ProductType = 2  # for request
+            HardwareVersion = 3
+            SoftwareVersion = 7
+            SerialNumber = 9
+            ProductModel = 12
+
+    class Bond:
+        id = 14
+
+        class Tags:
+            Error = 127
 
     class BondParams:
         id = 15
@@ -20,8 +38,9 @@ class DeviceConfig:
             Serial = 3
             BTVersion = 4
             MaxFrameSize = 5
-            MacAddress = 7
+            ClientMacAddress = 7
             EncryptionCounter = 9
+            Error = 127
 
     class Auth:
         id = 19
@@ -31,4 +50,3 @@ class DeviceConfig:
             Nonce = 2
 
     # SetTime = 5
-    # Bond = 14
