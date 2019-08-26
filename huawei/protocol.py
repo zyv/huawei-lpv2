@@ -176,3 +176,7 @@ def digest_challenge(server_nonce: bytes, client_nonce: bytes):
 
 def digest_response(server_nonce: bytes, client_nonce: bytes):
     return compute_digest("0110", server_nonce, client_nonce)
+
+
+def create_bond_key():
+    return b"\x00" * 32, b"\x00" * 32

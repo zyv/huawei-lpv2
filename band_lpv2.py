@@ -94,7 +94,9 @@ class Band:
                 raise RuntimeError("unexpected packet")
             self.parse_bond_params(packet.command)
         elif self.state == BandState.RequestedBond:
-            pass  # TODO: bonding
+            if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.Bond.id:
+                raise RuntimeError("unexpected packet")
+            self.parse_bond(packet.command)
 
         self._event.set()
 
@@ -122,7 +124,9 @@ class Band:
 
         await self.wait_for_state(BandState.ReceivedBondParams)
 
-        # TODO: bonding
+        await self.send_data(self.client, self.request_bond())
+
+        await self.wait_for_state(BandState.ReceivedBond)
 
     async def disconnect(self):
         await self.client.stop_notify(GATT_READ)
@@ -241,11 +245,27 @@ class Band:
         self.state = BandState.ReceivedBondParams
 
     def request_bond(self):
+        key, iv = create_bond_key()
+
+        packet = Packet(
+            service_id=DeviceConfig.id,
+            command_id=DeviceConfig.Bond.id,
+            command=Command([
+                TLV(tag=1),
+                TLV(tag=3, value=b"\x00"),
+                TLV(tag=5, value=CLIENT_SERIAL),
+                TLV(tag=6, value=key),
+                TLV(tag=7, value=iv),
+            ])
+        )
+
         self.state = BandState.RequestedBond
 
-    def parse_bond(self):
-        if self.bond_status == 0:
-            raise RuntimeError("bond params request rejected")
+        return packet
+
+    def parse_bond(self, command):
+        if DeviceConfig.Bond.Tags.Error in command:
+            raise RuntimeError("bond negotiation failed")
 
         self.state = BandState.ReceivedBond
 
