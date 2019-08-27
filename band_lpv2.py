@@ -22,7 +22,7 @@ CLIENT_MAC = "C4:B3:01:XX:XX:XX"
 GATT_WRITE = "0000fe01-0000-1000-8000-00805f9b34fb"
 GATT_READ = "0000fe02-0000-1000-8000-00805f9b34fb"
 
-CLIENT_SERIAL = b"X" * 6  # android.os.Build.SERIAL
+CLIENT_SERIAL = CLIENT_MAC.replace(":", "").encode()[-6:]  # android.os.Build.SERIAL
 
 
 class BandState(enum.Enum):
