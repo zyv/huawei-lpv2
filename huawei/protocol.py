@@ -2,8 +2,12 @@ import binascii
 import hashlib
 import hmac
 import math
+import secrets
 
 from typing import List
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 HUAWEI_LPV2_MAGIC = b"\x5A"
 
@@ -12,6 +16,11 @@ AUTH_VERSION = 1
 NONCE_LENGTH = 16
 
 NETWORK_BYTEORDER = "big"
+
+DIGEST_PREFIX = "70 FB 6C 24 03 5F DB 55 2F 38 89 8A EE DE 3F 69"
+
+SECRET_KEY_1 = "6F 75 6A 79 6D 77 71 34 63 6C 76 39 33 37 38 79"
+SECRET_KEY_2 = "62 31 30 6A 67 66 64 39 79 37 76 73 75 64 61 39"
 
 
 def encode_int(value: int, length: int = 2) -> bytes:
@@ -164,13 +173,12 @@ class Packet:
 
 
 def compute_digest(message: str, server_nonce: bytes, client_nonce: bytes):
-    prefix = "70FB6C24035FDB552F38898AEEDE3F69"
     nonce = server_nonce + client_nonce
 
     def digest(key: bytes, msg: bytes):
         return hmac.new(key, msg=msg, digestmod=hashlib.sha256).digest()
 
-    return digest(digest(bytes.fromhex(prefix + message), nonce), nonce)
+    return digest(digest(bytes.fromhex(DIGEST_PREFIX + message), nonce), nonce)
 
 
 def digest_challenge(server_nonce: bytes, client_nonce: bytes):
@@ -181,5 +189,30 @@ def digest_response(server_nonce: bytes, client_nonce: bytes):
     return compute_digest("0110", server_nonce, client_nonce)
 
 
-def create_bond_key():
-    return b"\x00" * 32, b"\x00" * 32
+def create_bonding_key(mac_address: str, iv: bytes):
+    mac_address_key = (mac_address.replace(":", "") + "0000").encode()
+
+    mixed_secret_key = [
+        ((key1_byte << 4) ^ key2_byte) % 0xFF
+        for key1_byte, key2_byte in zip(bytes.fromhex(SECRET_KEY_1), bytes.fromhex(SECRET_KEY_2))
+    ]
+
+    mixed_secret_key_hash = hashlib.sha256(bytes(mixed_secret_key)).digest()
+
+    final_mixed_key = [
+        ((mixed_key_hash_byte >> 6) ^ mac_address_byte) % 0xFF
+        for mixed_key_hash_byte, mac_address_byte in zip(mixed_secret_key_hash, mac_address_key)
+    ]
+
+    data = generate_nonce()
+    secret = hashlib.sha256(bytes(final_mixed_key)).digest()
+
+    backend = default_backend()
+    cipher = Cipher(algorithms.AES(secret), modes.CBC(iv), backend=backend)
+    encryptor = cipher.encryptor()
+
+    return iv, encryptor.update(data) + encryptor.finalize()
+
+
+def generate_nonce() -> bytes:
+    return secrets.token_bytes(NONCE_LENGTH)

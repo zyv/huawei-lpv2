@@ -3,11 +3,13 @@ import enum
 import logging
 import platform
 
+from pathlib import Path
+
 from bleak import BleakClient
 
 from huawei.services import DeviceConfig
 from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LENGTH, AUTH_VERSION, PROTOCOL_VERSION, \
-    encode_int, digest_challenge, digest_response, create_bond_key
+    encode_int, digest_challenge, digest_response, create_bonding_key, generate_nonce
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("lpv2")
@@ -37,9 +39,10 @@ class BandState(enum.Enum):
 
 
 class Band:
-    def __init__(self, client: BleakClient, mac_address, loop):
+    def __init__(self, client: BleakClient, mac_address: str, bonding_key: bytes, loop):
         self.client = client
         self.mac_address = mac_address
+        self.bonding_key = bonding_key
         self.loop = loop
 
         self.state = BandState.Disconnected
@@ -181,7 +184,7 @@ class Band:
         self.state = BandState.ReceivedLinkParams
 
     def request_authentication(self):
-        self.client_nonce = b"X" * NONCE_LENGTH  # TODO: randomize
+        self.client_nonce = generate_nonce()
 
         packet = Packet(
             service_id=DeviceConfig.id,
@@ -245,7 +248,7 @@ class Band:
         self.state = BandState.ReceivedBondParams
 
     def request_bond(self):
-        key, iv = create_bond_key()
+        iv, key = create_bonding_key(self.mac_address, self.bonding_key)
 
         packet = Packet(
             service_id=DeviceConfig.id,
@@ -270,9 +273,12 @@ class Band:
         self.state = BandState.ReceivedBond
 
 
+# Path("bonding_key.dat").write_bytes(generate_nonce())
+
+
 async def run(loop):
     async with BleakClient(DEVICE_MAC if platform.system() != "Darwin" else DEVICE_UUID, loop=loop) as client:
-        band = Band(client=client, mac_address=DEVICE_MAC, loop=loop)
+        band = Band(client=client, mac_address=DEVICE_MAC, bonding_key=Path("bonding_key.dat").read_bytes(), loop=loop)
         await band.connect()
         await band.disconnect()
 
