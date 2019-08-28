@@ -3,12 +3,11 @@ import logging
 import platform
 import struct
 
+from configparser import ConfigParser
+
 from bleak import BleakClient
 
 logging.basicConfig(level=logging.DEBUG)
-
-DEVICE_UUID = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
-DEVICE_MAC = "6C:B7:49:XX:XX:XX"
 
 CHARACTERISTICS = {
     "Battery Level": "00002a19-0000-1000-8000-00805f9b34fb",
@@ -33,8 +32,14 @@ BODY_SENSOR_LOCATIONS = {
 }
 
 
-async def read_data(address, loop):
-    async with BleakClient(address, loop=loop) as client:
+async def read_data(loop):
+    config = ConfigParser()
+    config.read("band.ini")
+
+    device_uuid = config["default"]["device_uuid"]
+    device_mac = config["default"]["device_mac"]
+
+    async with BleakClient(device_mac if platform.system() != "Darwin" else device_uuid, loop=loop) as client:
         for name, uuid in CHARACTERISTICS.items():
             characteristic = await client.read_gatt_char(uuid)
 
@@ -48,5 +53,5 @@ async def read_data(address, loop):
                 print(f"{name}: {characteristic}")
 
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(read_data(DEVICE_MAC if platform.system() != "Darwin" else DEVICE_UUID, loop))
+event_loop = asyncio.get_event_loop()
+event_loop.run_until_complete(read_data(event_loop))
