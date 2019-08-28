@@ -1,8 +1,10 @@
 import asyncio
+import base64
 import enum
 import logging
 import platform
 
+from configparser import ConfigParser
 from pathlib import Path
 
 from bleak import BleakClient
@@ -14,15 +16,10 @@ from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LEN
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("lpv2")
 
-DEVICE_UUID = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
-DEVICE_MAC = "6C:B7:49:XX:XX:XX"
-
-CLIENT_MAC = "C4:B3:01:XX:XX:XX"
+CONFIG_FILE = Path("band.ini")
 
 GATT_WRITE = "0000fe01-0000-1000-8000-00805f9b34fb"
 GATT_READ = "0000fe02-0000-1000-8000-00805f9b34fb"
-
-CLIENT_SERIAL = CLIENT_MAC.replace(":", "").encode()[-6:]  # android.os.Build.SERIAL
 
 
 class BandState(enum.Enum):
@@ -39,10 +36,12 @@ class BandState(enum.Enum):
 
 
 class Band:
-    def __init__(self, client: BleakClient, mac_address: str, bonding_key: bytes, loop):
+    def __init__(self, client: BleakClient, device_mac: str, bonding_key: bytes, client_mac: str, loop):
         self.client = client
-        self.mac_address = mac_address
+        self.device_mac = device_mac
         self.bonding_key = bonding_key
+        self.client_mac = client_mac
+        self.client_serial = client_mac.replace(":", "").encode()[-6:]  # android.os.Build.SERIAL
         self.loop = loop
 
         self.state = BandState.Disconnected
@@ -212,10 +211,10 @@ class Band:
             command_id=DeviceConfig.BondParams.id,
             command=Command(tlvs=[
                 TLV(tag=DeviceConfig.BondParams.Tags.Status),
-                TLV(tag=DeviceConfig.BondParams.Tags.Serial, value=CLIENT_SERIAL),
+                TLV(tag=DeviceConfig.BondParams.Tags.Serial, value=self.client_serial),
                 TLV(tag=DeviceConfig.BondParams.Tags.BTVersion, value=b"\x02"),
                 TLV(tag=DeviceConfig.BondParams.Tags.MaxFrameSize),
-                TLV(tag=DeviceConfig.BondParams.Tags.ClientMacAddress, value=CLIENT_MAC.encode()),
+                TLV(tag=DeviceConfig.BondParams.Tags.ClientMacAddress, value=self.client_mac.encode()),
                 TLV(tag=DeviceConfig.BondParams.Tags.EncryptionCounter)
             ])
         )
@@ -246,7 +245,7 @@ class Band:
         self.state = BandState.ReceivedBondParams
 
     def request_bond(self):
-        iv, key = create_bonding_key(self.mac_address, self.bonding_key)
+        iv, key = create_bonding_key(self.device_mac, self.bonding_key)
 
         packet = Packet(
             service_id=DeviceConfig.id,
@@ -254,7 +253,7 @@ class Band:
             command=Command([
                 TLV(tag=1),
                 TLV(tag=3, value=b"\x00"),
-                TLV(tag=5, value=CLIENT_SERIAL),
+                TLV(tag=5, value=self.client_serial),
                 TLV(tag=6, value=key),
                 TLV(tag=7, value=iv),
             ])
@@ -271,12 +270,27 @@ class Band:
         self.state = BandState.ReceivedBond
 
 
-# Path("bonding_key.dat").write_bytes(generate_nonce())
+config = ConfigParser()
+
+if not CONFIG_FILE.exists():
+    config["default"]["bonding_key"] = base64.b64encode(generate_nonce())
+    config["default"]["device_uuid"] = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
+    config["default"]["device_mac"] = "6C:B7:49:XX:XX:XX"
+    config["default"]["client_mac"] = "C4:B3:01:XX:XX:XX"
+    with open(CONFIG_FILE.name, "w") as fp:
+        config.write(fp)
 
 
 async def run(loop):
-    async with BleakClient(DEVICE_MAC if platform.system() != "Darwin" else DEVICE_UUID, loop=loop) as client:
-        band = Band(client=client, mac_address=DEVICE_MAC, bonding_key=Path("bonding_key.dat").read_bytes(), loop=loop)
+    config.read(CONFIG_FILE.name)
+
+    bonding_key = base64.b64decode(config["default"]["bonding_key"])
+    device_uuid = config["default"]["device_uuid"]
+    device_mac = config["default"]["device_mac"]
+    client_mac = config["default"]["client_mac"]
+
+    async with BleakClient(device_mac if platform.system() != "Darwin" else device_uuid, loop=loop) as client:
+        band = Band(client=client, device_mac=device_mac, bonding_key=bonding_key, client_mac=client_mac, loop=loop)
         await band.connect()
         await band.disconnect()
 

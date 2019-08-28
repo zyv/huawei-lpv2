@@ -27,6 +27,8 @@ class DeviceConfig:
         id = 14
 
         class Tags:
+            Status = 2
+
             Error = 127
 
     class BondParams:
