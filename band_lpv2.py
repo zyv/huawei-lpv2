@@ -54,7 +54,7 @@ class Band:
 
         self.auth_version = None
         self.server_nonce = None
-        self.client_nonce = None
+        self.client_nonce = generate_nonce()
 
         self.bond_status = None
         self.bond_status_info = None
@@ -184,8 +184,6 @@ class Band:
         self.state = BandState.ReceivedLinkParams
 
     def request_authentication(self):
-        self.client_nonce = generate_nonce()
-
         packet = Packet(
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.Auth.id,
