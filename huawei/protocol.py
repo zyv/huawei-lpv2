@@ -19,6 +19,9 @@ NETWORK_BYTEORDER = "big"
 
 DIGEST_PREFIX = "70 FB 6C 24 03 5F DB 55 2F 38 89 8A EE DE 3F 69"
 
+MESSAGE_RESPONSE = "0110"
+MESSAGE_CHALLENGE = "0100"
+
 SECRET_KEY_1 = "6F 75 6A 79 6D 77 71 34 63 6C 76 39 33 37 38 79"
 SECRET_KEY_2 = "62 31 30 6A 67 66 64 39 79 37 76 73 75 64 61 39"
 
@@ -182,11 +185,11 @@ def compute_digest(message: str, server_nonce: bytes, client_nonce: bytes):
 
 
 def digest_challenge(server_nonce: bytes, client_nonce: bytes):
-    return compute_digest("0100", server_nonce, client_nonce)
+    return compute_digest(MESSAGE_CHALLENGE, server_nonce, client_nonce)
 
 
 def digest_response(server_nonce: bytes, client_nonce: bytes):
-    return compute_digest("0110", server_nonce, client_nonce)
+    return compute_digest(MESSAGE_RESPONSE, server_nonce, client_nonce)
 
 
 def create_bonding_key(mac_address: str, iv: bytes):
