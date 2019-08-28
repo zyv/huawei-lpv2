@@ -211,7 +211,7 @@ class Band:
             command_id=DeviceConfig.BondParams.id,
             command=Command(tlvs=[
                 TLV(tag=DeviceConfig.BondParams.Tags.Status),
-                TLV(tag=DeviceConfig.BondParams.Tags.Serial, value=self.client_serial),
+                TLV(tag=DeviceConfig.BondParams.Tags.ClientSerial, value=self.client_serial),
                 TLV(tag=DeviceConfig.BondParams.Tags.BTVersion, value=b"\x02"),
                 TLV(tag=DeviceConfig.BondParams.Tags.MaxFrameSize),
                 TLV(tag=DeviceConfig.BondParams.Tags.ClientMacAddress, value=self.client_mac.encode()),

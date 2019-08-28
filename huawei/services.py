@@ -11,6 +11,7 @@ class DeviceConfig:
             ConnectionInterval = 4
             ServerNonce = 5
             PathExtendNumber = 6  # apparently used for BTVersion == 0
+
             Error = 127
 
     class ProductType:
@@ -37,11 +38,12 @@ class DeviceConfig:
         class Tags:
             Status = 1
             StatusInfo = 2
-            Serial = 3
+            ClientSerial = 3
             BTVersion = 4
             MaxFrameSize = 5
             ClientMacAddress = 7
             EncryptionCounter = 9
+
             Error = 127
 
     class Auth:
