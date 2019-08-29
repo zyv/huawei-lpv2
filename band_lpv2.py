@@ -46,12 +46,12 @@ class Band:
 
         self.state = BandState.Disconnected
 
-        self.protocol_version = None
-        self.max_frame_size = None
-        self.max_link_size = None
-        self.connection_interval = None
+        self.protocol_version = 2
+        self.max_frame_size = 254
+        self.max_link_size = 254
+        self.connection_interval = 10  # milliseconds
 
-        self.auth_version = None
+        self.auth_version = 1
         self.server_nonce = None
         self.client_nonce = generate_nonce()
 
