@@ -138,12 +138,15 @@ class Band:
         await self.client.stop_notify(GATT_READ)
         self.state = BandState.Disconnected
 
+    async def set_time(self):
+        await self.send_data(self.client, self.request_set_time())
+
     def request_link_params(self) -> Packet:
         self.state = BandState.RequestedLinkParams
         return Packet(
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.LinkParams.id,
-            command=Command([
+            command=Command(tlvs=[
                 TLV(DeviceConfig.LinkParams.Tags.ProtocolVersion),
                 TLV(DeviceConfig.LinkParams.Tags.MaxFrameSize),
                 TLV(DeviceConfig.LinkParams.Tags.MaxLinkSize),
@@ -190,7 +193,7 @@ class Band:
         packet = Packet(
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.Auth.id,
-            command=Command([
+            command=Command(tlvs=[
                 TLV(tag=DeviceConfig.Auth.Tags.Challenge, value=digest_challenge(self.server_nonce, self.client_nonce)),
                 TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(self.auth_version) + self.client_nonce)),
             ])
@@ -254,7 +257,7 @@ class Band:
         packet = Packet(
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.Bond.id,
-            command=Command([
+            command=Command(tlvs=[
                 TLV(tag=1),
                 TLV(tag=3, value=b"\x00"),
                 TLV(tag=5, value=self.client_serial),
