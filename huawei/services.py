@@ -14,6 +14,13 @@ class DeviceConfig:
 
             Error = 127
 
+    class SetTime:
+        id = 5
+
+        class Tags:
+            Timestamp = 1
+            ZoneOffset = 2
+
     class ProductType:
         id = 7
 
@@ -52,5 +59,3 @@ class DeviceConfig:
         class Tags:
             Challenge = 1
             Nonce = 2
-
-    # SetTime = 5

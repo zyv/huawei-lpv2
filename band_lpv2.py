@@ -3,6 +3,7 @@ import base64
 import enum
 import logging
 import platform
+import time
 
 from configparser import ConfigParser
 from pathlib import Path
@@ -104,7 +105,7 @@ class Band:
 
         self._event.set()
 
-    async def connect(self):
+    async def init(self):
         is_connected = await self.client.is_connected()
 
         if not is_connected:
@@ -116,6 +117,7 @@ class Band:
 
         await self.client.start_notify(GATT_READ, self.receive_data)
 
+    async def connect(self):
         await self.send_data(self.client, self.request_link_params())
 
         await self.wait_for_state(BandState.ReceivedLinkParams)
@@ -271,6 +273,23 @@ class Band:
 
         self.state = BandState.ReceivedBond
 
+    def request_set_time(self):
+        zone_hours, zone_minutes = divmod(time.timezone / -3600, 1)
+        zone_minutes *= 60
+
+        offset = encode_int(int(zone_hours), length=1) + encode_int(int(zone_minutes), length=1)
+
+        packet = Packet(
+            service_id=DeviceConfig.id,
+            command_id=DeviceConfig.SetTime.id,
+            command=Command(tlvs=[
+                TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(time.time()), length=4)),
+                TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=offset),
+            ]),
+        )
+
+        return packet
+
 
 config = ConfigParser()
 
@@ -293,7 +312,9 @@ async def run(loop):
 
     async with BleakClient(device_mac if platform.system() != "Darwin" else device_uuid, loop=loop) as client:
         band = Band(client=client, device_mac=device_mac, bonding_key=bonding_key, client_mac=client_mac, loop=loop)
+        await band.init()
         await band.connect()
+        await band.set_time()
         await band.disconnect()
 
 
