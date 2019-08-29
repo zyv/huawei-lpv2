@@ -13,6 +13,8 @@ from huawei.services import DeviceConfig
 from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LENGTH, AUTH_VERSION, PROTOCOL_VERSION, \
     encode_int, digest_challenge, digest_response, create_bonding_key, generate_nonce
 
+DEVICE_NAME = "default"
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("lpv2")
 
@@ -273,10 +275,10 @@ class Band:
 config = ConfigParser()
 
 if not CONFIG_FILE.exists():
-    config["default"]["bonding_key"] = base64.b64encode(generate_nonce())
-    config["default"]["device_uuid"] = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
-    config["default"]["device_mac"] = "6C:B7:49:XX:XX:XX"
-    config["default"]["client_mac"] = "C4:B3:01:XX:XX:XX"
+    config[DEVICE_NAME]["bonding_key"] = base64.b64encode(generate_nonce())
+    config[DEVICE_NAME]["device_uuid"] = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
+    config[DEVICE_NAME]["device_mac"] = "6C:B7:49:XX:XX:XX"
+    config[DEVICE_NAME]["client_mac"] = "C4:B3:01:XX:XX:XX"
     with open(CONFIG_FILE.name, "w") as fp:
         config.write(fp)
 
@@ -284,10 +286,10 @@ if not CONFIG_FILE.exists():
 async def run(loop):
     config.read(CONFIG_FILE.name)
 
-    bonding_key = base64.b64decode(config["default"]["bonding_key"])
-    device_uuid = config["default"]["device_uuid"]
-    device_mac = config["default"]["device_mac"]
-    client_mac = config["default"]["client_mac"]
+    bonding_key = base64.b64decode(config[DEVICE_NAME]["bonding_key"])
+    device_uuid = config[DEVICE_NAME]["device_uuid"]
+    device_mac = config[DEVICE_NAME]["device_mac"]
+    client_mac = config[DEVICE_NAME]["client_mac"]
 
     async with BleakClient(device_mac if platform.system() != "Darwin" else device_uuid, loop=loop) as client:
         band = Band(client=client, device_mac=device_mac, bonding_key=bonding_key, client_mac=client_mac, loop=loop)

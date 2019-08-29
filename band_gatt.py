@@ -7,6 +7,8 @@ from configparser import ConfigParser
 
 from bleak import BleakClient
 
+DEVICE_NAME = "default"
+
 logging.basicConfig(level=logging.DEBUG)
 
 CHARACTERISTICS = {
@@ -36,8 +38,8 @@ async def read_data(loop):
     config = ConfigParser()
     config.read("band.ini")
 
-    device_uuid = config["default"]["device_uuid"]
-    device_mac = config["default"]["device_mac"]
+    device_uuid = config[DEVICE_NAME]["device_uuid"]
+    device_mac = config[DEVICE_NAME]["device_mac"]
 
     async with BleakClient(device_mac if platform.system() != "Darwin" else device_uuid, loop=loop) as client:
         for name, uuid in CHARACTERISTICS.items():
