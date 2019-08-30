@@ -12,7 +12,7 @@ from bleak import BleakClient
 
 from huawei.services import DeviceConfig
 from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LENGTH, AUTH_VERSION, PROTOCOL_VERSION, \
-    encode_int, digest_challenge, digest_response, create_bonding_key, generate_nonce
+    encode_int, digest_challenge, digest_response, create_bonding_data, generate_nonce, encrypt, create_secret_key
 
 DEVICE_NAME = "default"
 
@@ -252,7 +252,7 @@ class Band:
         self.state = BandState.ReceivedBondParams
 
     def request_bond(self):
-        iv, key = create_bonding_key(self.device_mac, self.bonding_key)
+        data = create_bonding_data(self.device_mac, self.bonding_key)
 
         packet = Packet(
             service_id=DeviceConfig.id,
@@ -261,8 +261,8 @@ class Band:
                 TLV(tag=1),
                 TLV(tag=3, value=b"\x00"),
                 TLV(tag=5, value=self.client_serial),
-                TLV(tag=6, value=key),
-                TLV(tag=7, value=iv),
+                TLV(tag=6, value=data),
+                TLV(tag=7, value=self.bonding_key),
             ])
         )
 

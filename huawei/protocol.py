@@ -7,6 +7,7 @@ import secrets
 from typing import List
 
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 HUAWEI_LPV2_MAGIC = b"\x5A"
@@ -192,7 +193,22 @@ def digest_response(server_nonce: bytes, client_nonce: bytes):
     return compute_digest(MESSAGE_RESPONSE, server_nonce, client_nonce)
 
 
-def create_bonding_key(mac_address: str, iv: bytes):
+def generate_nonce() -> bytes:
+    return secrets.token_bytes(NONCE_LENGTH)
+
+
+def encrypt(data: bytes, secret: bytes, iv: bytes) -> bytes:
+    padder = padding.PKCS7(128).padder()
+    padded_data = padder.update(data) + padder.finalize()
+
+    backend = default_backend()
+    cipher = Cipher(algorithms.AES(secret), modes.CBC(iv), backend=backend)
+    encryptor = cipher.encryptor()
+
+    return encryptor.update(padded_data) + encryptor.finalize()
+
+
+def create_secret_key(mac_address: str) -> bytes:
     mac_address_key = (mac_address.replace(":", "") + "0000").encode()
 
     mixed_secret_key = [
@@ -207,15 +223,8 @@ def create_bonding_key(mac_address: str, iv: bytes):
         for mixed_key_hash_byte, mac_address_byte in zip(mixed_secret_key_hash, mac_address_key)
     ]
 
-    data = generate_nonce()
-    secret = hashlib.sha256(bytes(final_mixed_key)).digest()
-
-    backend = default_backend()
-    cipher = Cipher(algorithms.AES(secret), modes.CBC(iv), backend=backend)
-    encryptor = cipher.encryptor()
-
-    return iv, encryptor.update(data) + encryptor.finalize()
+    return hashlib.sha256(bytes(final_mixed_key)).digest()
 
 
-def generate_nonce() -> bytes:
-    return secrets.token_bytes(NONCE_LENGTH)
+def create_bonding_data(mac_address: str, iv: bytes) -> bytes:
+    return encrypt(generate_nonce(), create_secret_key(mac_address), iv)
