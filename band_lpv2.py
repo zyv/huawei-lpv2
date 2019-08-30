@@ -222,7 +222,7 @@ class Band:
                 TLV(tag=DeviceConfig.BondParams.Tags.BTVersion, value=b"\x02"),
                 TLV(tag=DeviceConfig.BondParams.Tags.MaxFrameSize),
                 TLV(tag=DeviceConfig.BondParams.Tags.ClientMacAddress, value=self.client_mac.encode()),
-                TLV(tag=DeviceConfig.BondParams.Tags.EncryptionCounter)
+                TLV(tag=DeviceConfig.BondParams.Tags.EncryptionCounter),
             ])
         )
 
