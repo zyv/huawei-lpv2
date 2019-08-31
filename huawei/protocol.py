@@ -85,7 +85,7 @@ class TLV:
         self.value = value
 
     def __repr__(self):
-        return f"TLV(tag={self.tag}, value=b'{hexlify(self.value)}')"
+        return f"TLV(tag={self.tag}, value=bytes.fromhex('{hexlify(self.value)}'))"
 
     def __eq__(self, other: "TLV"):
         return (self.tag, self.value) == (other.tag, other.value)
