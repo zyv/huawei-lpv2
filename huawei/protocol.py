@@ -222,18 +222,18 @@ def create_secret_key(mac_address: str) -> bytes:
     mac_address_key = (mac_address.replace(":", "") + "0000").encode()
 
     mixed_secret_key = [
-        ((key1_byte << 4) ^ key2_byte) % 0xFF
+        ((key1_byte << 4) ^ key2_byte) & 0xFF
         for key1_byte, key2_byte in zip(bytes.fromhex(SECRET_KEY_1), bytes.fromhex(SECRET_KEY_2))
     ]
 
     mixed_secret_key_hash = hashlib.sha256(bytes(mixed_secret_key)).digest()
 
     final_mixed_key = [
-        ((mixed_key_hash_byte >> 6) ^ mac_address_byte) % 0xFF
+        ((mixed_key_hash_byte >> 6) ^ mac_address_byte) & 0xFF
         for mixed_key_hash_byte, mac_address_byte in zip(mixed_secret_key_hash, mac_address_key)
     ]
 
-    return hashlib.sha256(bytes(final_mixed_key)).digest()
+    return hashlib.sha256(bytes(final_mixed_key)).digest()[:16]
 
 
 def create_bonding_data(mac_address: str, iv: bytes) -> bytes:
