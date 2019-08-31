@@ -208,6 +208,16 @@ def encrypt(data: bytes, secret: bytes, iv: bytes) -> bytes:
     return encryptor.update(padded_data) + encryptor.finalize()
 
 
+def decrypt(data: bytes, secret: bytes, iv: bytes) -> bytes:
+    backend = default_backend()
+    cipher = Cipher(algorithms.AES(secret), modes.CBC(iv), backend=backend)
+    decryptor = cipher.decryptor()
+    padded_data = decryptor.update(data) + decryptor.finalize()
+
+    unpadder = padding.PKCS7(128).unpadder()
+    return unpadder.update(padded_data) + unpadder.finalize()
+
+
 def create_secret_key(mac_address: str) -> bytes:
     mac_address_key = (mac_address.replace(":", "") + "0000").encode()
 
