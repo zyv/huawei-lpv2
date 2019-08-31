@@ -12,7 +12,7 @@ from bleak import BleakClient
 
 from huawei.services import DeviceConfig
 from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LENGTH, AUTH_VERSION, PROTOCOL_VERSION, \
-    encode_int, digest_challenge, digest_response, create_bonding_data, generate_nonce, encrypt, create_secret_key
+    encode_int, digest_challenge, digest_response, create_bonding_key, generate_nonce, encrypt
 
 DEVICE_NAME = "default"
 
@@ -39,15 +39,16 @@ class BandState(enum.Enum):
 
 
 class Band:
-    def __init__(self, client: BleakClient, device_mac: str, bonding_key: bytes, client_mac: str, loop):
+    def __init__(self, client: BleakClient, client_mac: str, device_mac: str, secret: bytes, loop):
+        self.state = BandState.Disconnected
+
         self.client = client
-        self.device_mac = device_mac
-        self.bonding_key = bonding_key
         self.client_mac = client_mac
-        self.client_serial = client_mac.replace(":", "").encode()[-6:]  # android.os.Build.SERIAL
+        self.device_mac = device_mac
+        self.secret = secret
         self.loop = loop
 
-        self.state = BandState.Disconnected
+        self.client_serial = client_mac.replace(":", "").encode()[-6:]  # android.os.Build.SERIAL
 
         self.protocol_version = 2
         self.max_frame_size = 254
@@ -130,7 +131,7 @@ class Band:
 
         await self.wait_for_state(BandState.ReceivedBondParams)
 
-        await self.send_data(self.client, self.request_bond())
+        await self.send_data(self.client, self.request_bond())  # TODO: not needed if status is already correct
 
         await self.wait_for_state(BandState.ReceivedBond)
 
@@ -252,7 +253,10 @@ class Band:
         self.state = BandState.ReceivedBondParams
 
     def request_bond(self):
-        data = create_bonding_data(self.device_mac, self.bonding_key)
+
+        # TODO: extract
+        self.encryption_counter += 1
+        iv = generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
 
         packet = Packet(
             service_id=DeviceConfig.id,
@@ -261,8 +265,8 @@ class Band:
                 TLV(tag=1),
                 TLV(tag=3, value=b"\x00"),
                 TLV(tag=5, value=self.client_serial),
-                TLV(tag=6, value=data),
-                TLV(tag=7, value=self.bonding_key),
+                TLV(tag=6, value=create_bonding_key(self.device_mac, self.secret, iv)),
+                TLV(tag=7, value=iv),
             ])
         )
 
@@ -287,47 +291,57 @@ class Band:
             TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=offset),
         ])
 
+        self.encryption_counter += 1  # TODO: overflow
+        iv = generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
+
         packet = Packet(
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.SetTime.id,
             command=Command(tlvs=[
                 TLV(tag=124, value=b"\x01"),
-                TLV(tag=125, value=self.bonding_key),
-                TLV(tag=126, value=encrypt(bytes(plain_command), create_secret_key(self.device_mac), self.bonding_key)),
+                TLV(tag=125, value=iv),
+                TLV(tag=126, value=encrypt(bytes(plain_command), self.secret, iv)),
             ]),
         )
 
         return packet
 
 
-config = ConfigParser()
-
-if not CONFIG_FILE.exists():
-    config[DEVICE_NAME] = {
-        "bonding_key": base64.b64encode(generate_nonce()).decode(),
-        "device_uuid": "A0E49DB2-XXXX-XXXX-XXXX-D75121192329",
-        "device_mac": "6C:B7:49:XX:XX:XX",
-        "client_mac": "C4:B3:01:XX:XX:XX",
-    }
-    with open(CONFIG_FILE.name, "w") as fp:
-        config.write(fp)
-
-
-async def run(loop):
-    config.read(CONFIG_FILE.name)
-
-    bonding_key = base64.b64decode(config[DEVICE_NAME]["bonding_key"])
-    device_uuid = config[DEVICE_NAME]["device_uuid"]
-    device_mac = config[DEVICE_NAME]["device_mac"]
-    client_mac = config[DEVICE_NAME]["client_mac"]
+async def run(config, loop):
+    secret = base64.b64decode(config["secret"])
+    device_uuid = config["device_uuid"]
+    device_mac = config["device_mac"]
+    client_mac = config["client_mac"]
 
     async with BleakClient(device_mac if platform.system() != "Darwin" else device_uuid, loop=loop) as client:
-        band = Band(client=client, device_mac=device_mac, bonding_key=bonding_key, client_mac=client_mac, loop=loop)
+        band = Band(client=client, client_mac=client_mac, device_mac=device_mac, secret=secret, loop=loop)
         await band.init()
         await band.connect()
         await band.set_time()
         await band.disconnect()
 
 
-event_loop = asyncio.get_event_loop()
-event_loop.run_until_complete(run(event_loop))
+def main():
+    config = ConfigParser()
+
+    if not CONFIG_FILE.exists():
+        config[DEVICE_NAME] = {
+            "device_uuid": "A0E49DB2-XXXX-XXXX-XXXX-D75121192329",
+            "device_mac": "6C:B7:49:XX:XX:XX",
+            "client_mac": "C4:B3:01:XX:XX:XX",
+            "secret": base64.b64encode(generate_nonce()).decode(),
+        }
+
+        with open(CONFIG_FILE.name, "w") as fp:
+            config.write(fp)
+
+        return
+
+    config.read(CONFIG_FILE.name)
+
+    event_loop = asyncio.get_event_loop()
+    event_loop.run_until_complete(run(config[DEVICE_NAME], event_loop))
+
+
+if __name__ == "__main__":
+    main()

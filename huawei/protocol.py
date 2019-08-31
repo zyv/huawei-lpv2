@@ -236,5 +236,5 @@ def create_secret_key(mac_address: str) -> bytes:
     return hashlib.sha256(bytes(final_mixed_key)).digest()[:16]
 
 
-def create_bonding_data(mac_address: str, iv: bytes) -> bytes:
-    return encrypt(generate_nonce(), create_secret_key(mac_address), iv)
+def create_bonding_key(mac_address: str, key: bytes, iv: bytes) -> bytes:
+    return encrypt(key, create_secret_key(mac_address), iv)
