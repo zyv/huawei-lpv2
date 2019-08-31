@@ -303,10 +303,12 @@ class Band:
 config = ConfigParser()
 
 if not CONFIG_FILE.exists():
-    config[DEVICE_NAME]["bonding_key"] = base64.b64encode(generate_nonce())
-    config[DEVICE_NAME]["device_uuid"] = "A0E49DB2-XXXX-XXXX-XXXX-D75121192329"
-    config[DEVICE_NAME]["device_mac"] = "6C:B7:49:XX:XX:XX"
-    config[DEVICE_NAME]["client_mac"] = "C4:B3:01:XX:XX:XX"
+    config[DEVICE_NAME] = {
+        "bonding_key": base64.b64encode(generate_nonce()).decode(),
+        "device_uuid": "A0E49DB2-XXXX-XXXX-XXXX-D75121192329",
+        "device_mac": "6C:B7:49:XX:XX:XX",
+        "client_mac": "C4:B3:01:XX:XX:XX",
+    }
     with open(CONFIG_FILE.name, "w") as fp:
         config.write(fp)
 
