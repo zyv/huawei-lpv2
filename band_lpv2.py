@@ -10,7 +10,7 @@ from pathlib import Path
 
 from bleak import BleakClient
 
-from huawei.services import DeviceConfig
+from huawei.services import DeviceConfig, TAG_ERROR
 from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LENGTH, AUTH_VERSION, PROTOCOL_VERSION, \
     encode_int, digest_challenge, digest_response, create_bonding_key, generate_nonce, encrypt
 
@@ -156,7 +156,7 @@ class Band:
         )
 
     def parse_link_params(self, command: Command):
-        if DeviceConfig.LinkParams.Tags.Error in command:
+        if TAG_ERROR in command:
             raise RuntimeError("link parameter negotiation failed")
 
         self.protocol_version = decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)
@@ -232,7 +232,7 @@ class Band:
         return packet
 
     def parse_bond_params(self, command: Command):
-        if DeviceConfig.BondParams.Tags.Error in command:
+        if TAG_ERROR in command:
             raise RuntimeError("bond parameter negotiation failed")
 
         self.bond_status = decode_int(command[DeviceConfig.BondParams.Tags.Status].value)
@@ -275,7 +275,7 @@ class Band:
         return packet
 
     def parse_bond(self, command):
-        if DeviceConfig.Bond.Tags.Error in command:
+        if TAG_ERROR in command:
             raise RuntimeError("bond negotiation failed")
 
         self.state = BandState.ReceivedBond

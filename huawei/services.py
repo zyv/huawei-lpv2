@@ -1,3 +1,6 @@
+TAG_ERROR = 127
+
+
 class DeviceConfig:
     id = 1
 
@@ -11,8 +14,6 @@ class DeviceConfig:
             ConnectionInterval = 4
             ServerNonce = 5
             PathExtendNumber = 6  # apparently used for BTVersion == 0
-
-            Error = 127
 
     class SetTime:
         id = 5
@@ -37,8 +38,6 @@ class DeviceConfig:
         class Tags:
             Status = 2
 
-            Error = 127
-
     class BondParams:
         id = 15
 
@@ -50,8 +49,6 @@ class DeviceConfig:
             MaxFrameSize = 5
             ClientMacAddress = 7
             EncryptionCounter = 9
-
-            Error = 127
 
     class Auth:
         id = 19
