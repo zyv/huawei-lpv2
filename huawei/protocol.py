@@ -14,11 +14,10 @@ HUAWEI_LPV2_MAGIC = b"\x5A"
 
 PROTOCOL_VERSION = 2
 AUTH_VERSION = 1
-NONCE_LENGTH = 16
 
 NETWORK_BYTEORDER = "big"
 
-DIGEST_PREFIX = "70 FB 6C 24 03 5F DB 55 2F 38 89 8A EE DE 3F 69"
+DIGEST_SECRET = "70 FB 6C 24 03 5F DB 55 2F 38 89 8A EE DE 3F 69"
 
 MESSAGE_RESPONSE = "0110"
 MESSAGE_CHALLENGE = "0100"
@@ -27,6 +26,7 @@ SECRET_KEY_1 = "6F 75 6A 79 6D 77 71 34 63 6C 76 39 33 37 38 79"
 SECRET_KEY_2 = "62 31 30 6A 67 66 64 39 79 37 76 73 75 64 61 39"
 
 AES_BLOCK_SIZE = 16
+NONCE_LENGTH = 16
 
 
 def encode_int(value: int, length: int = 2) -> bytes:
@@ -184,7 +184,7 @@ def compute_digest(message: str, server_nonce: bytes, client_nonce: bytes):
     def digest(key: bytes, msg: bytes):
         return hmac.new(key, msg=msg, digestmod=hashlib.sha256).digest()
 
-    return digest(digest(bytes.fromhex(DIGEST_PREFIX + message), nonce), nonce)
+    return digest(digest(bytes.fromhex(DIGEST_SECRET + message), nonce), nonce)
 
 
 def digest_challenge(server_nonce: bytes, client_nonce: bytes):
@@ -199,20 +199,20 @@ def generate_nonce() -> bytes:
     return secrets.token_bytes(NONCE_LENGTH)
 
 
-def encrypt(data: bytes, secret: bytes, iv: bytes) -> bytes:
+def encrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
     padder = padding.PKCS7(8 * AES_BLOCK_SIZE).padder()
     padded_data = padder.update(data) + padder.finalize()
 
     backend = default_backend()
-    cipher = Cipher(algorithms.AES(secret), modes.CBC(iv), backend=backend)
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=backend)
     encryptor = cipher.encryptor()
 
     return encryptor.update(padded_data) + encryptor.finalize()
 
 
-def decrypt(data: bytes, secret: bytes, iv: bytes) -> bytes:
+def decrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
     backend = default_backend()
-    cipher = Cipher(algorithms.AES(secret), modes.CBC(iv), backend=backend)
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=backend)
     decryptor = cipher.decryptor()
     padded_data = decryptor.update(data) + decryptor.finalize()
 

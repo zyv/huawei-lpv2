@@ -1,6 +1,8 @@
 import unittest
 
-from .protocol import HUAWEI_LPV2_MAGIC, VarInt, TLV, Command, Packet, encode_int, decode_int, hexlify
+from .protocol import HUAWEI_LPV2_MAGIC, VarInt, TLV, Command, Packet, encode_int, decode_int, hexlify, \
+    create_secret_key, create_bonding_key, generate_nonce, decrypt, AES_BLOCK_SIZE, NONCE_LENGTH, encrypt, \
+    compute_digest
 
 
 class TestUtils(unittest.TestCase):
@@ -86,3 +88,28 @@ class TestPacket(unittest.TestCase):
 
     def test_serialization(self):
         self.assertEqual(bytes.fromhex(self.DATA), bytes(self.PACKET))
+
+
+class TestCrypto(unittest.TestCase):
+    MAC_ADDRESS = "FF:FF:FF:FF:FF:CC"
+    SECRET_KEY = bytes.fromhex("EE FF 25 87 2A BB 19 1A 15 37 85 24 AF C0 89 E6")
+    DIGEST = "BD 37 66 40 CD 62 73 FB AE A3 25 1B F3 4F 51 3D E3 B5 F3 4A 95 DC 9B 6F FD DB 93 AD 59 67 03 B0"
+
+    def test_generate_nonce(self):
+        self.assertEqual(AES_BLOCK_SIZE, NONCE_LENGTH)
+        self.assertEqual(AES_BLOCK_SIZE, len(generate_nonce()))
+
+    def test_digest(self):
+        self.assertEqual(bytes.fromhex(self.DIGEST), compute_digest("", b"", b""))
+
+    def test_secret_key(self):
+        self.assertEqual(self.SECRET_KEY, create_secret_key(self.MAC_ADDRESS))
+
+    def test_roundtrip(self):
+        data, key, iv = generate_nonce() + b'abc', generate_nonce(), generate_nonce()
+        self.assertEqual(data, decrypt(encrypt(data, key, iv), key, iv))
+
+    def test_bonding_key(self):
+        key, iv = generate_nonce(), generate_nonce()
+        bonding_key = create_bonding_key(self.MAC_ADDRESS, key, iv)
+        self.assertEqual(key, decrypt(bonding_key, self.SECRET_KEY, iv))
