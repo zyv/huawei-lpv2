@@ -152,7 +152,7 @@ class Packet:
     def __bytes__(self) -> bytes:
         payload = bytes([self.service_id, self.command_id]) + bytes(self.command)
 
-        if len(payload) > (2 ** 8) * 2:
+        if len(payload) > 2 ** (8 * 2):
             raise ValueError(f"payload too large: {len(payload)}")
 
         data = HUAWEI_LPV2_MAGIC + encode_int(len(payload) + 1) + b"\0" + payload
