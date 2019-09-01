@@ -10,7 +10,7 @@ from pathlib import Path
 
 from bleak import BleakClient
 
-from huawei.services import DeviceConfig, TAG_ERROR
+from huawei.services import DeviceConfig, TAG_ERROR, CryptoTags
 from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LENGTH, AUTH_VERSION, PROTOCOL_VERSION, \
     encode_int, digest_challenge, digest_response, create_bonding_key, generate_nonce, encrypt
 
@@ -298,9 +298,9 @@ class Band:
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.SetTime.id,
             command=Command(tlvs=[
-                TLV(tag=124, value=b"\x01"),
-                TLV(tag=125, value=iv),
-                TLV(tag=126, value=encrypt(bytes(plain_command), self.secret, iv)),
+                TLV(tag=CryptoTags.Encryption, value=b"\x01"),
+                TLV(tag=CryptoTags.InitVector, value=iv),
+                TLV(tag=CryptoTags.CipherText, value=encrypt(bytes(plain_command), self.secret, iv)),
             ]),
         )
 

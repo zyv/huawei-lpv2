@@ -1,6 +1,12 @@
 TAG_ERROR = 127
 
 
+class CryptoTags:
+    Encryption = 124
+    InitVector = 125
+    CipherText = 126
+
+
 class DeviceConfig:
     id = 1
 
