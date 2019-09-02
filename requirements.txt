@@ -1,3 +1,4 @@
 bleak
 cryptography
 nose
+coverage
