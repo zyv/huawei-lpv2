@@ -1,4 +1,4 @@
-from huawei.protocol import Packet, Command, TLV, digest_challenge, encode_int, AUTH_VERSION
+from huawei.protocol import Packet, Command, TLV, digest_challenge, encode_int, AUTH_VERSION, create_bonding_key
 from huawei.services import DeviceConfig
 
 
@@ -26,7 +26,7 @@ def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
     )
 
 
-def request_bond_params(client_serial: str, client_mac: str):
+def request_bond_params(client_serial: str, client_mac: str) -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.BondParams.id,
@@ -37,5 +37,19 @@ def request_bond_params(client_serial: str, client_mac: str):
             TLV(tag=DeviceConfig.BondParams.Tags.MaxFrameSize),
             TLV(tag=DeviceConfig.BondParams.Tags.ClientMacAddress, value=client_mac.encode()),
             TLV(tag=DeviceConfig.BondParams.Tags.EncryptionCounter),
+        ])
+    )
+
+
+def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> Packet:
+    return Packet(
+        service_id=DeviceConfig.id,
+        command_id=DeviceConfig.Bond.id,
+        command=Command(tlvs=[
+            TLV(tag=1),
+            TLV(tag=3, value=b"\x00"),
+            TLV(tag=5, value=client_serial.encode()),
+            TLV(tag=6, value=create_bonding_key(device_mac, key, iv)),
+            TLV(tag=7, value=iv),
         ])
     )

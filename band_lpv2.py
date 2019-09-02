@@ -222,23 +222,8 @@ class Band:
         self.state = BandState.ReceivedBondParams
 
     def _request_bond(self):
-        iv = self._next_iv()
-
-        packet = Packet(
-            service_id=DeviceConfig.id,
-            command_id=DeviceConfig.Bond.id,
-            command=Command(tlvs=[
-                TLV(tag=1),
-                TLV(tag=3, value=b"\x00"),
-                TLV(tag=5, value=self.client_serial),
-                TLV(tag=6, value=create_bonding_key(self.device_mac, self.secret, iv)),
-                TLV(tag=7, value=iv),
-            ])
-        )
-
         self.state = BandState.RequestedBond
-
-        return packet
+        return huawei.commands.request_bond(self.client_serial, self.device_mac, self.secret, self._next_iv())
 
     def _parse_bond(self, command):
         if TAG_ERROR in command:
