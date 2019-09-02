@@ -62,9 +62,13 @@ class Band:
         self.bond_status = None
         self.bond_status_info = None
         self.bt_version = None
-        self.encryption_counter = None
+        self.encryption_counter = 0
 
         self._event = asyncio.Event()
+
+    def _next_iv(self):
+        self.encryption_counter += 1  # TODO: overflow
+        return generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
 
     async def wait_for_state(self, state: BandState):
         logger.debug(f"Waiting for state: {state}...")
@@ -253,10 +257,7 @@ class Band:
         self.state = BandState.ReceivedBondParams
 
     def request_bond(self):
-
-        # TODO: extract
-        self.encryption_counter += 1
-        iv = generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
+        iv = self._next_iv()
 
         packet = Packet(
             service_id=DeviceConfig.id,
@@ -286,16 +287,13 @@ class Band:
 
         offset = encode_int(int(zone_hours), length=1) + encode_int(int(zone_minutes), length=1)
 
-        self.encryption_counter += 1  # TODO: overflow
-        iv = generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
-
         packet = Packet(
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.SetTime.id,
             command=Command(tlvs=[
                 TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(time.time()), length=4)),
                 TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=offset),
-            ]).encrypt(self.secret, iv),
+            ]).encrypt(self.secret, self._next_iv()),
         )
 
         return packet
