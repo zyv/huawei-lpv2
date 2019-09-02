@@ -94,19 +94,19 @@ class Band:
         if self.state == BandState.RequestedLinkParams:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.LinkParams.id:
                 raise RuntimeError("unexpected packet")
-            self.parse_link_params(packet.command)
+            self._parse_link_params(packet.command)
         elif self.state == BandState.RequestedAuthentication:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.Auth.id:
                 raise RuntimeError("unexpected packet")
-            self.parse_authentication(packet.command)
+            self._parse_authentication(packet.command)
         elif self.state == BandState.RequestedBondParams:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.BondParams.id:
                 raise RuntimeError("unexpected packet")
-            self.parse_bond_params(packet.command)
+            self._parse_bond_params(packet.command)
         elif self.state == BandState.RequestedBond:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.Bond.id:
                 raise RuntimeError("unexpected packet")
-            self.parse_bond(packet.command)
+            self._parse_bond(packet.command)
 
         self._event.set()
 
@@ -123,19 +123,19 @@ class Band:
         await self.client.start_notify(GATT_READ, self.receive_data)
 
     async def connect(self):
-        await self.send_data(self.client, self.request_link_params())
+        await self.send_data(self.client, self._request_link_params())
 
         await self.wait_for_state(BandState.ReceivedLinkParams)
 
-        await self.send_data(self.client, self.request_authentication())
+        await self.send_data(self.client, self._request_authentication())
 
         await self.wait_for_state(BandState.ReceivedAuthentication)
 
-        await self.send_data(self.client, self.request_bond_params())
+        await self.send_data(self.client, self._request_bond_params())
 
         await self.wait_for_state(BandState.ReceivedBondParams)
 
-        await self.send_data(self.client, self.request_bond())  # TODO: not needed if status is already correct
+        await self.send_data(self.client, self._request_bond())  # TODO: not needed if status is already correct
 
         await self.wait_for_state(BandState.ReceivedBond)
 
@@ -144,9 +144,9 @@ class Band:
         self.state = BandState.Disconnected
 
     async def set_time(self):
-        await self.send_data(self.client, self.request_set_time())
+        await self.send_data(self.client, self._request_set_time())
 
-    def request_link_params(self) -> Packet:
+    def _request_link_params(self) -> Packet:
         self.state = BandState.RequestedLinkParams
         return Packet(
             service_id=DeviceConfig.id,
@@ -159,7 +159,7 @@ class Band:
             ])
         )
 
-    def parse_link_params(self, command: Command):
+    def _parse_link_params(self, command: Command):
         if TAG_ERROR in command:
             raise RuntimeError("link parameter negotiation failed")
 
@@ -194,7 +194,7 @@ class Band:
 
         self.state = BandState.ReceivedLinkParams
 
-    def request_authentication(self):
+    def _request_authentication(self):
         packet = Packet(
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.Auth.id,
@@ -208,7 +208,7 @@ class Band:
 
         return packet
 
-    def parse_authentication(self, command: Command):
+    def _parse_authentication(self, command: Command):
         expected_answer = digest_response(self.server_nonce, self.client_nonce)
         provided_answer = command[DeviceConfig.Auth.Tags.Challenge].value
 
@@ -217,7 +217,7 @@ class Band:
 
         self.state = BandState.ReceivedAuthentication
 
-    def request_bond_params(self):
+    def _request_bond_params(self):
         packet = Packet(
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.BondParams.id,
@@ -235,7 +235,7 @@ class Band:
 
         return packet
 
-    def parse_bond_params(self, command: Command):
+    def _parse_bond_params(self, command: Command):
         if TAG_ERROR in command:
             raise RuntimeError("bond parameter negotiation failed")
 
@@ -256,7 +256,7 @@ class Band:
 
         self.state = BandState.ReceivedBondParams
 
-    def request_bond(self):
+    def _request_bond(self):
         iv = self._next_iv()
 
         packet = Packet(
@@ -275,13 +275,13 @@ class Band:
 
         return packet
 
-    def parse_bond(self, command):
+    def _parse_bond(self, command):
         if TAG_ERROR in command:
             raise RuntimeError("bond negotiation failed")
 
         self.state = BandState.ReceivedBond
 
-    def request_set_time(self):
+    def _request_set_time(self):
         zone_hours, zone_minutes = divmod(time.timezone / -3600, 1)
         zone_minutes *= 60
 
