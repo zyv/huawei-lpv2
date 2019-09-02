@@ -53,3 +53,16 @@ def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> 
             TLV(tag=DeviceConfig.Bond.Tags.InitVector, value=iv),
         ])
     )
+
+
+def request_set_time(timestamp: float, offset_hours: int, offset_minutes: int, key: bytes, iv: bytes) -> Packet:
+    offset = encode_int(offset_hours, length=1) + encode_int(offset_minutes, length=1)
+
+    return Packet(
+        service_id=DeviceConfig.id,
+        command_id=DeviceConfig.SetTime.id,
+        command=Command(tlvs=[
+            TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(timestamp), length=4)),
+            TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=offset),
+        ]).encrypt(key, iv),
+    )

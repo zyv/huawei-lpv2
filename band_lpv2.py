@@ -233,20 +233,9 @@ class Band:
 
     def _request_set_time(self):
         zone_hours, zone_minutes = divmod(time.timezone / -3600, 1)
-        zone_minutes *= 60
+        zone_hours, zone_minutes = int(zone_hours), int(zone_minutes * 60)
 
-        offset = encode_int(int(zone_hours), length=1) + encode_int(int(zone_minutes), length=1)
-
-        packet = Packet(
-            service_id=DeviceConfig.id,
-            command_id=DeviceConfig.SetTime.id,
-            command=Command(tlvs=[
-                TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(time.time()), length=4)),
-                TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=offset),
-            ]).encrypt(self.secret, self._next_iv()),
-        )
-
-        return packet
+        return huawei.commands.request_set_time(time.time(), zone_hours, zone_minutes, self.secret, self._next_iv())
 
 
 async def run(config, loop):
