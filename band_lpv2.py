@@ -10,9 +10,11 @@ from pathlib import Path
 
 from bleak import BleakClient
 
+import huawei.commands
+
 from huawei.services import DeviceConfig, TAG_ERROR
 from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LENGTH, AUTH_VERSION, PROTOCOL_VERSION, \
-    encode_int, digest_challenge, digest_response, create_bonding_key, generate_nonce
+    encode_int, digest_response, create_bonding_key, generate_nonce
 
 DEVICE_NAME = "default"
 
@@ -50,12 +52,10 @@ class Band:
 
         self.client_serial = client_mac.replace(":", "").encode()[-6:]  # android.os.Build.SERIAL
 
-        self.protocol_version = 2
         self.max_frame_size = 254
         self.max_link_size = 254
         self.connection_interval = 10  # milliseconds
 
-        self.auth_version = 1
         self.server_nonce = None
         self.client_nonce = generate_nonce()
 
@@ -148,65 +148,44 @@ class Band:
 
     def _request_link_params(self) -> Packet:
         self.state = BandState.RequestedLinkParams
-        return Packet(
-            service_id=DeviceConfig.id,
-            command_id=DeviceConfig.LinkParams.id,
-            command=Command(tlvs=[
-                TLV(DeviceConfig.LinkParams.Tags.ProtocolVersion),
-                TLV(DeviceConfig.LinkParams.Tags.MaxFrameSize),
-                TLV(DeviceConfig.LinkParams.Tags.MaxLinkSize),
-                TLV(DeviceConfig.LinkParams.Tags.ConnectionInterval),
-            ])
-        )
+        return huawei.commands.request_link_params()
 
     def _parse_link_params(self, command: Command):
         if TAG_ERROR in command:
             raise RuntimeError("link parameter negotiation failed")
 
-        self.protocol_version = decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)
+        protocol_version = decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)
         self.max_frame_size = decode_int(command[DeviceConfig.LinkParams.Tags.MaxFrameSize].value)
         self.max_link_size = decode_int(command[DeviceConfig.LinkParams.Tags.MaxLinkSize].value)
         self.connection_interval = decode_int(command[DeviceConfig.LinkParams.Tags.ConnectionInterval].value)
 
-        self.auth_version = decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])
+        auth_version = decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])
         self.server_nonce = bytes(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[2:18])
 
         # TODO: optional path extend number parsing
 
-        if self.protocol_version != PROTOCOL_VERSION:
-            raise RuntimeError(f"protocol version mismatch: {self.protocol_version} != {PROTOCOL_VERSION}")
+        if protocol_version != PROTOCOL_VERSION:
+            raise RuntimeError(f"protocol version mismatch: {protocol_version} != {PROTOCOL_VERSION}")
 
-        if self.auth_version != AUTH_VERSION:
-            raise RuntimeError(f"authentication scheme version mismatch: {self.auth_version} != {AUTH_VERSION}")
+        if auth_version != AUTH_VERSION:
+            raise RuntimeError(f"authentication scheme version mismatch: {auth_version} != {AUTH_VERSION}")
 
         if len(self.server_nonce) != NONCE_LENGTH:
             raise RuntimeError(f"server nonce length mismatch: {len(self.server_nonce)} != {NONCE_LENGTH}")
 
         logger.info(
             f"Negotiated link parameters: "
-            f"{self.protocol_version}, "
             f"{self.max_frame_size}, "
             f"{self.max_link_size}, "
             f"{self.connection_interval}, "
-            f"{self.auth_version}, "
             f"{hexlify(self.server_nonce)}"
         )
 
         self.state = BandState.ReceivedLinkParams
 
     def _request_authentication(self):
-        packet = Packet(
-            service_id=DeviceConfig.id,
-            command_id=DeviceConfig.Auth.id,
-            command=Command(tlvs=[
-                TLV(tag=DeviceConfig.Auth.Tags.Challenge, value=digest_challenge(self.server_nonce, self.client_nonce)),
-                TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(self.auth_version) + self.client_nonce)),
-            ])
-        )
-
         self.state = BandState.RequestedAuthentication
-
-        return packet
+        return huawei.commands.request_authentication(client_nonce=self.client_nonce, server_nonce=self.server_nonce)
 
     def _parse_authentication(self, command: Command):
         expected_answer = digest_response(self.server_nonce, self.client_nonce)
