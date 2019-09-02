@@ -24,3 +24,18 @@ def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
             TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(AUTH_VERSION) + client_nonce)),
         ])
     )
+
+
+def request_bond_params(client_serial: str, client_mac: str):
+    return Packet(
+        service_id=DeviceConfig.id,
+        command_id=DeviceConfig.BondParams.id,
+        command=Command(tlvs=[
+            TLV(tag=DeviceConfig.BondParams.Tags.Status),
+            TLV(tag=DeviceConfig.BondParams.Tags.ClientSerial, value=client_serial.encode()),
+            TLV(tag=DeviceConfig.BondParams.Tags.BTVersion, value=b"\x02"),
+            TLV(tag=DeviceConfig.BondParams.Tags.MaxFrameSize),
+            TLV(tag=DeviceConfig.BondParams.Tags.ClientMacAddress, value=client_mac.encode()),
+            TLV(tag=DeviceConfig.BondParams.Tags.EncryptionCounter),
+        ])
+    )

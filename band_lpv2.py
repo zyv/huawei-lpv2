@@ -50,7 +50,7 @@ class Band:
         self.secret = secret
         self.loop = loop
 
-        self.client_serial = client_mac.replace(":", "").encode()[-6:]  # android.os.Build.SERIAL
+        self.client_serial = client_mac.replace(":", "")[-6:]  # android.os.Build.SERIAL
 
         self.max_frame_size = 254
         self.max_link_size = 254
@@ -197,22 +197,8 @@ class Band:
         self.state = BandState.ReceivedAuthentication
 
     def _request_bond_params(self):
-        packet = Packet(
-            service_id=DeviceConfig.id,
-            command_id=DeviceConfig.BondParams.id,
-            command=Command(tlvs=[
-                TLV(tag=DeviceConfig.BondParams.Tags.Status),
-                TLV(tag=DeviceConfig.BondParams.Tags.ClientSerial, value=self.client_serial),
-                TLV(tag=DeviceConfig.BondParams.Tags.BTVersion, value=b"\x02"),
-                TLV(tag=DeviceConfig.BondParams.Tags.MaxFrameSize),
-                TLV(tag=DeviceConfig.BondParams.Tags.ClientMacAddress, value=self.client_mac.encode()),
-                TLV(tag=DeviceConfig.BondParams.Tags.EncryptionCounter),
-            ])
-        )
-
         self.state = BandState.RequestedBondParams
-
-        return packet
+        return huawei.commands.request_bond_params(self.client_serial, self.client_mac)
 
     def _parse_bond_params(self, command: Command):
         if TAG_ERROR in command:
