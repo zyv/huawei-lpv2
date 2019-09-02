@@ -10,9 +10,9 @@ from pathlib import Path
 
 from bleak import BleakClient
 
-from huawei.services import DeviceConfig, TAG_ERROR, CryptoTags
+from huawei.services import DeviceConfig, TAG_ERROR
 from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LENGTH, AUTH_VERSION, PROTOCOL_VERSION, \
-    encode_int, digest_challenge, digest_response, create_bonding_key, generate_nonce, encrypt
+    encode_int, digest_challenge, digest_response, create_bonding_key, generate_nonce
 
 DEVICE_NAME = "default"
 
