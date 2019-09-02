@@ -46,10 +46,10 @@ def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> 
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.Bond.id,
         command=Command(tlvs=[
-            TLV(tag=1),
-            TLV(tag=3, value=b"\x00"),
-            TLV(tag=5, value=client_serial.encode()),
-            TLV(tag=6, value=create_bonding_key(device_mac, key, iv)),
-            TLV(tag=7, value=iv),
+            TLV(tag=DeviceConfig.Bond.Tags.BondRequest),
+            TLV(tag=DeviceConfig.Bond.Tags.RequestCode, value=b"\x00"),
+            TLV(tag=DeviceConfig.Bond.Tags.ClientSerial, value=client_serial.encode()),
+            TLV(tag=DeviceConfig.Bond.Tags.BondingKey, value=create_bonding_key(device_mac, key, iv)),
+            TLV(tag=DeviceConfig.Bond.Tags.InitVector, value=iv),
         ])
     )

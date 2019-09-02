@@ -42,7 +42,12 @@ class DeviceConfig:
         id = 14
 
         class Tags:
+            BondRequest = 1
             Status = 2
+            RequestCode = 3
+            ClientSerial = 5
+            BondingKey = 6
+            InitVector = 7
 
     class BondParams:
         id = 15
