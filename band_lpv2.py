@@ -286,11 +286,6 @@ class Band:
 
         offset = encode_int(int(zone_hours), length=1) + encode_int(int(zone_minutes), length=1)
 
-        plain_command = Command(tlvs=[
-            TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(time.time()), length=4)),
-            TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=offset),
-        ])
-
         self.encryption_counter += 1  # TODO: overflow
         iv = generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
 
@@ -298,10 +293,9 @@ class Band:
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.SetTime.id,
             command=Command(tlvs=[
-                TLV(tag=CryptoTags.Encryption, value=b"\x01"),
-                TLV(tag=CryptoTags.InitVector, value=iv),
-                TLV(tag=CryptoTags.CipherText, value=encrypt(bytes(plain_command), self.secret, iv)),
-            ]),
+                TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(time.time()), length=4)),
+                TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=offset),
+            ]).encrypt(self.secret, iv),
         )
 
         return packet

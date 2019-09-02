@@ -1,5 +1,6 @@
 import unittest
 
+from huawei.services import CryptoTags
 from .protocol import HUAWEI_LPV2_MAGIC, VarInt, TLV, Command, Packet, encode_int, decode_int, hexlify, \
     create_secret_key, create_bonding_key, generate_nonce, decrypt, AES_BLOCK_SIZE, NONCE_LENGTH, encrypt, \
     compute_digest
@@ -73,6 +74,22 @@ class TestCommand(unittest.TestCase):
         cmd = Command.from_bytes(bytes.fromhex(self.DATA))
         self.assertTrue(all(tag in cmd for tag in [1, 2, 3, 4]))
         self.assertFalse(5 in cmd)
+
+    def test_crypto(self):
+        command_plain = Command(tlvs=[TLV(tag=1, value=b"abc"), TLV(tag=2, value=b"cde")])
+
+        key, iv = generate_nonce(), generate_nonce()
+        command_encrypted = command_plain.encrypt(key, iv)
+
+        self.assertTrue(all(
+            tag in command_encrypted for tag in
+            (CryptoTags.Encryption, CryptoTags.InitVector, CryptoTags.Encryption)
+        ))
+
+        self.assertEqual(b"\x01", command_encrypted[CryptoTags.Encryption].value)
+        self.assertEqual(iv, command_encrypted[CryptoTags.InitVector].value)
+
+        self.assertTrue(command_plain == command_encrypted.decrypt(key, iv))
 
 
 class TestPacket(unittest.TestCase):

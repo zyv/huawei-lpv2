@@ -10,6 +10,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+from huawei.services import CryptoTags
+
 HUAWEI_LPV2_MAGIC = b"\x5A"
 
 PROTOCOL_VERSION = 2
@@ -126,6 +128,16 @@ class Command:
 
     def __bytes__(self):
         return b"".join(map(bytes, self.tlvs))
+
+    def encrypt(self, key: bytes, iv: bytes) -> "Command":
+        return Command(tlvs=[
+            TLV(tag=CryptoTags.Encryption, value=b"\x01"),
+            TLV(tag=CryptoTags.InitVector, value=iv),
+            TLV(tag=CryptoTags.CipherText, value=encrypt(bytes(self), key, iv)),
+        ])
+
+    def decrypt(self, key: bytes, iv: bytes) -> "Command":
+        return Command.from_bytes(decrypt(self[CryptoTags.CipherText].value, key, iv))
 
     @staticmethod
     def from_bytes(data: bytes):
