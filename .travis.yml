@@ -4,4 +4,5 @@ python:
 install:
   - pip install -r requirements.txt
 script:
+  - flake8
   - nosetests -v --with-coverage --cover-package=huawei

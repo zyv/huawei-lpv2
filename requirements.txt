@@ -2,3 +2,8 @@ bleak
 cryptography
 nose
 coverage
+flake8
+flake8-coding
+flake8-commas
+flake8-import-order
+flake8-quotes
