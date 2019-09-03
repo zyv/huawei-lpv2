@@ -3,7 +3,6 @@ import hashlib
 import hmac
 import math
 import secrets
-
 from typing import List
 
 from cryptography.hazmat.backends import default_backend
@@ -177,7 +176,7 @@ class Packet:
         if len(data) < 1 + 2 + 1 + 2:
             raise ValueError("packet too short")
 
-        magic, length, padding, payload, checksum = data[0], data[1:2], data[3], data[4:-2], data[-2:]
+        magic, _, _, payload, checksum = data[0], data[1:2], data[3], data[4:-2], data[-2:]
 
         if magic != ord(HUAWEI_LPV2_MAGIC):
             raise ValueError(f"magic mismatch: {magic} != {HUAWEI_LPV2_MAGIC}")

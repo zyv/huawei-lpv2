@@ -4,17 +4,15 @@ import enum
 import logging
 import platform
 import time
-
 from configparser import ConfigParser
 from pathlib import Path
 
 from bleak import BleakClient
 
 import huawei.commands
-
-from huawei.services import DeviceConfig, TAG_RESULT, LocaleConfig, MeasurementSystem
-from huawei.protocol import Packet, Command, TLV, hexlify, decode_int, NONCE_LENGTH, AUTH_VERSION, PROTOCOL_VERSION, \
-    encode_int, digest_response, create_bonding_key, generate_nonce
+from huawei.protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, TLV, decode_int, \
+    digest_response, encode_int, generate_nonce, hexlify
+from huawei.services import DeviceConfig, LocaleConfig, MeasurementSystem, TAG_RESULT
 
 DEVICE_NAME = "default"
 
@@ -192,7 +190,7 @@ class Band:
             f"{self.max_frame_size}, "
             f"{self.max_link_size}, "
             f"{self.connection_interval}, "
-            f"{hexlify(self.server_nonce)}"
+            f"{hexlify(self.server_nonce)}",
         )
 
         self.state = BandState.ReceivedLinkParams
@@ -230,7 +228,7 @@ class Band:
             f"{self.bond_status_info}, "
             f"{self.bt_version}, "
             f"{self.max_frame_size}, "
-            f"{self.encryption_counter}"
+            f"{self.encryption_counter}",
         )
 
         self.state = BandState.ReceivedBondParams

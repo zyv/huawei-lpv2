@@ -2,7 +2,6 @@ import asyncio
 import logging
 import platform
 import struct
-
 from configparser import ConfigParser
 
 from bleak import BleakClient

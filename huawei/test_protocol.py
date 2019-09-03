@@ -1,9 +1,8 @@
 import unittest
 
-from huawei.services import CryptoTags
-from .protocol import HUAWEI_LPV2_MAGIC, VarInt, TLV, Command, Packet, encode_int, decode_int, hexlify, \
-    create_secret_key, create_bonding_key, generate_nonce, decrypt, AES_BLOCK_SIZE, NONCE_LENGTH, encrypt, \
-    compute_digest
+from .protocol import AES_BLOCK_SIZE, Command, HUAWEI_LPV2_MAGIC, NONCE_LENGTH, Packet, TLV, VarInt, compute_digest, \
+    create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, encrypt, generate_nonce, hexlify
+from .services import CryptoTags
 
 
 class TestUtils(unittest.TestCase):
@@ -123,7 +122,7 @@ class TestCrypto(unittest.TestCase):
         self.assertEqual(self.SECRET_KEY, create_secret_key(self.MAC_ADDRESS))
 
     def test_roundtrip(self):
-        data, key, iv = generate_nonce() + b'abc', generate_nonce(), generate_nonce()
+        data, key, iv = generate_nonce() + b"abc", generate_nonce(), generate_nonce()
         self.assertEqual(data, decrypt(encrypt(data, key, iv), key, iv))
 
     def test_bonding_key(self):
