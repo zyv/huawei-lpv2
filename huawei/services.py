@@ -1,4 +1,6 @@
-TAG_ERROR = 127
+TAG_RESULT = 127
+
+RESULT_SUCCESS = 100000
 
 
 class CryptoTags:
