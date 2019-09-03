@@ -69,3 +69,19 @@ class DeviceConfig:
         class Tags:
             Challenge = 1
             Nonce = 2
+
+
+class LocaleConfig:
+    id = 12
+
+    class SetLocale:
+        id = 1
+
+        class Tags:
+            LanguageTag = 1  # IETF BCP 47 language tag, see https://tools.ietf.org/html/rfc5646
+            MeasurementSystem = 2
+
+
+class MeasurementSystem:
+    Metric = 0
+    Imperial = 1
