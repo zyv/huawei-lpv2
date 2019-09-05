@@ -37,15 +37,28 @@ class TestVarInt(unittest.TestCase):
 
 
 class TestTLV(unittest.TestCase):
+    TEST_TLV = TLV(tag=1, value=b"abc")
+    TEST_BYTES = b"\x01\x03abc"
+
     def test_serialization(self):
-        tlv = TLV(tag=1, value=b"abc")
-        self.assertEqual(b"\x01\x03abc", bytes(tlv))
+        self.assertEqual(self.TEST_BYTES, bytes(self.TEST_TLV))
 
     def test_deserialization(self):
-        pass  # TODO
+        self.assertEqual(self.TEST_TLV, TLV.from_bytes(self.TEST_BYTES))
+
+    def test_nested_tlvs(self):
+        nested_tlvs = TLV(tag=132, value=bytes(Command(tlvs=[
+            TLV(tag=140, value=bytes(Command(tlvs=[
+                TLV(tag=141, value=bytes(Command(tlvs=[self.TEST_TLV]))),
+            ]))),
+        ])))
+
+        self.assertEqual(132, TLV.from_bytes(bytes(nested_tlvs)).tag)
+        self.assertEqual(None, TLV.from_bytes(bytes(nested_tlvs)).command[140].command[141].command[1].command)
+        self.assertEqual([self.TEST_TLV], TLV.from_bytes(bytes(nested_tlvs)).command[140].command[141].command.tlvs)
 
     def test_equality(self):
-        tlv1, tlv2, tlv3 = TLV(tag=1, value=b"abc"), TLV(tag=1, value=b"abc"), TLV(tag=1, value=b"cde")
+        tlv1, tlv2, tlv3 = self.TEST_TLV, TLV(tag=1, value=b"abc"), TLV(tag=1, value=b"cde")
         self.assertEqual(tlv1, tlv2)
         self.assertNotEqual(tlv1, tlv3)
 

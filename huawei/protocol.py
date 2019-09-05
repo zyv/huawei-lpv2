@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import math
 import secrets
-from typing import List
+from typing import List, Optional
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
@@ -88,7 +88,8 @@ class TLV:
         self.value = value
 
     def __repr__(self):
-        return f"TLV(tag={self.tag}, value=bytes.fromhex('{hexlify(self.value)}'))"
+        value = f"{self.command}" if self.command is not None else f"bytes.fromhex('{hexlify(self.value)}'"
+        return f"TLV(tag={self.tag}, value={value}))"
 
     def __eq__(self, other: "TLV"):
         return (self.tag, self.value) == (other.tag, other.value)
@@ -98,6 +99,10 @@ class TLV:
 
     def __bytes__(self):
         return bytes([self.tag]) + bytes(VarInt(len(self.value))) + self.value
+
+    @property
+    def command(self) -> Optional["Command"]:
+        return Command.from_bytes(self.value) if self.tag & 0b10000000 else None
 
     @staticmethod
     def from_bytes(data: bytes):
