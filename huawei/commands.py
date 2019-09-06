@@ -1,5 +1,5 @@
 from huawei.protocol import AUTH_VERSION, Command, Packet, TLV, create_bonding_key, digest_challenge, encode_int
-from huawei.services import DeviceConfig
+from huawei.services import DeviceConfig, LocaleConfig
 
 
 def request_link_params() -> Packet:
@@ -64,5 +64,16 @@ def request_set_time(timestamp: float, offset_hours: int, offset_minutes: int, k
         command=Command(tlvs=[
             TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(timestamp), length=4)),
             TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=offset),
+        ]).encrypt(key, iv),
+    )
+
+
+def set_locale(language_tag: str, measurement_system: int, key: bytes, iv: bytes) -> Packet:
+    return Packet(
+        service_id=LocaleConfig.id,
+        command_id=LocaleConfig.SetLocale.id,
+        command=Command(tlvs=[
+            TLV(tag=LocaleConfig.SetLocale.Tags.LanguageTag, value=language_tag.encode()),
+            TLV(tag=LocaleConfig.SetLocale.Tags.MeasurementSystem, value=encode_int(measurement_system, length=1)),
         ]).encrypt(key, iv),
     )

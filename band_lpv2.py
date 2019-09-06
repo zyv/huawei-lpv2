@@ -10,9 +10,9 @@ from pathlib import Path
 from bleak import BleakClient
 
 import huawei.commands
-from huawei.protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, TLV, decode_int, \
+from huawei.protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, decode_int, \
     digest_response, encode_int, generate_nonce, hexlify
-from huawei.services import DeviceConfig, LocaleConfig, MeasurementSystem, TAG_RESULT
+from huawei.services import DeviceConfig, MeasurementSystem, TAG_RESULT
 
 DEVICE_NAME = "default"
 
@@ -147,15 +147,8 @@ class Band:
     async def set_time(self):
         await self.send_data(self.client, self._request_set_time())
 
-    async def set_language(self, language_tag: str = "en-US", measurement_system: int = MeasurementSystem.Metric):
-        packet = Packet(
-            service_id=LocaleConfig.id,
-            command_id=LocaleConfig.SetLocale.id,
-            command=Command(tlvs=[
-                TLV(tag=LocaleConfig.SetLocale.Tags.LanguageTag, value=language_tag.encode()),
-                TLV(tag=LocaleConfig.SetLocale.Tags.MeasurementSystem, value=encode_int(measurement_system, length=1)),
-            ]).encrypt(self.secret, self._next_iv()),
-        )
+    async def set_locale(self, language_tag: str = "en-US", measurement_system: int = MeasurementSystem.Metric):
+        packet = huawei.commands.set_locale(language_tag, measurement_system, self.secret, self._next_iv())
         await self.send_data(self.client, packet)
 
     def _request_link_params(self) -> Packet:
@@ -261,7 +254,7 @@ async def run(config, loop):
         await band.init()
         await band.connect()
         await band.set_time()
-        await band.set_language()
+        await band.set_locale()
         await band.disconnect()
 
 
