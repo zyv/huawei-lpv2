@@ -29,6 +29,8 @@ SECRET_KEY_2 = "62 31 30 6A 67 66 64 39 79 37 76 73 75 64 61 39"
 AES_BLOCK_SIZE = 16
 NONCE_LENGTH = 16
 
+ENCRYPTION_COUNTER_MAX = 4294967295
+
 
 def encode_int(value: int, length: int = 2) -> bytes:
     return value.to_bytes(length=length, byteorder=NETWORK_BYTEORDER)

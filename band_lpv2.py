@@ -10,8 +10,8 @@ from pathlib import Path
 from bleak import BleakClient
 
 import huawei.commands
-from huawei.protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, decode_int, \
-    digest_response, encode_int, generate_nonce, hexlify
+from huawei.protocol import AUTH_VERSION, Command, ENCRYPTION_COUNTER_MAX, NONCE_LENGTH, PROTOCOL_VERSION, Packet, \
+    decode_int, digest_response, encode_int, generate_nonce, hexlify
 from huawei.services import DeviceConfig, MeasurementSystem, TAG_RESULT
 
 DEVICE_NAME = "default"
@@ -65,7 +65,9 @@ class Band:
         self._event = asyncio.Event()
 
     def _next_iv(self):
-        self.encryption_counter += 1  # TODO: overflow
+        if self.encryption_counter == ENCRYPTION_COUNTER_MAX:
+            self.encryption_counter = 1
+        self.encryption_counter += 1
         return generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
 
     async def wait_for_state(self, state: BandState):
