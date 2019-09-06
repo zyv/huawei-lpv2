@@ -90,7 +90,7 @@ class TLV:
         self.value = value
 
     def __repr__(self):
-        value = f"{self.command}" if self.command is not None else f"bytes.fromhex('{hexlify(self.value)}'"
+        value = f"bytes({self.command})" if self.command is not None else f"bytes.fromhex('{hexlify(self.value)}'"
         return f"TLV(tag={self.tag}, value={value}))"
 
     def __eq__(self, other: "TLV"):
