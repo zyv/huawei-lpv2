@@ -141,7 +141,7 @@ class Band:
         await self.wait_for_state(BandState.ReceivedBond)
 
     async def disconnect(self):
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.5)
 
         await self.client.stop_notify(GATT_READ)
 
