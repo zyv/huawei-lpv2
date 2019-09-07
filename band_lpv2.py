@@ -5,6 +5,7 @@ import logging
 import platform
 import time
 from configparser import ConfigParser
+from datetime import datetime
 from pathlib import Path
 
 from bleak import BleakClient
@@ -239,10 +240,15 @@ class Band:
         self.state = BandState.ReceivedBond
 
     def _request_set_time(self):
-        zone_hours, zone_minutes = divmod(time.timezone / -3600, 1)
-        zone_hours, zone_minutes = int(zone_hours), int(zone_minutes * 60)
+        ts = time.time()
 
-        return huawei.commands.request_set_time(time.time(), zone_hours, zone_minutes, self.secret, self._next_iv())
+        utc_offset = (datetime.fromtimestamp(ts) - datetime.utcfromtimestamp(ts)).total_seconds() / 3600
+        float_hours, float_minutes = divmod(utc_offset, 1)
+
+        offset_hours = int(abs(float_hours) + 128) if float_hours < 0 else int(float_hours)
+        offset_minutes = int(abs(float_minutes * 60))
+
+        return huawei.commands.request_set_time(ts, offset_hours, offset_minutes, self.secret, self._next_iv())
 
 
 async def run(config, loop):
