@@ -26,7 +26,7 @@ MESSAGE_CHALLENGE = "0100"
 SECRET_KEY_1 = "6F 75 6A 79 6D 77 71 34 63 6C 76 39 33 37 38 79"
 SECRET_KEY_2 = "62 31 30 6A 67 66 64 39 79 37 76 73 75 64 61 39"
 
-AES_BLOCK_SIZE = 16
+AES_KEY_SIZE = 16
 NONCE_LENGTH = 16
 
 ENCRYPTION_COUNTER_MAX = 4294967295
@@ -218,7 +218,7 @@ def generate_nonce() -> bytes:
 
 
 def encrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
-    padder = padding.PKCS7(8 * AES_BLOCK_SIZE).padder()
+    padder = padding.PKCS7(8 * AES_KEY_SIZE).padder()
     padded_data = padder.update(data) + padder.finalize()
 
     backend = default_backend()
@@ -234,7 +234,7 @@ def decrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
     decryptor = cipher.decryptor()
     padded_data = decryptor.update(data) + decryptor.finalize()
 
-    unpadder = padding.PKCS7(8 * AES_BLOCK_SIZE).unpadder()
+    unpadder = padding.PKCS7(8 * AES_KEY_SIZE).unpadder()
     return unpadder.update(padded_data) + unpadder.finalize()
 
 
@@ -253,7 +253,7 @@ def create_secret_key(mac_address: str) -> bytes:
         for mixed_key_hash_byte, mac_address_byte in zip(mixed_secret_key_hash, mac_address_key)
     ]
 
-    return hashlib.sha256(bytes(final_mixed_key)).digest()[:AES_BLOCK_SIZE]
+    return hashlib.sha256(bytes(final_mixed_key)).digest()[:AES_KEY_SIZE]
 
 
 def create_bonding_key(mac_address: str, key: bytes, iv: bytes) -> bytes:

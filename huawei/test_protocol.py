@@ -1,6 +1,6 @@
 import unittest
 
-from .protocol import AES_BLOCK_SIZE, Command, HUAWEI_LPV2_MAGIC, NONCE_LENGTH, Packet, TLV, VarInt, compute_digest, \
+from .protocol import AES_KEY_SIZE, Command, HUAWEI_LPV2_MAGIC, NONCE_LENGTH, Packet, TLV, VarInt, compute_digest, \
     create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, encrypt, generate_nonce, hexlify
 from .services import CryptoTags
 
@@ -125,8 +125,8 @@ class TestCrypto(unittest.TestCase):
     DIGEST = "BD 37 66 40 CD 62 73 FB AE A3 25 1B F3 4F 51 3D E3 B5 F3 4A 95 DC 9B 6F FD DB 93 AD 59 67 03 B0"
 
     def test_generate_nonce(self):
-        self.assertEqual(AES_BLOCK_SIZE, NONCE_LENGTH)
-        self.assertEqual(AES_BLOCK_SIZE, len(generate_nonce()))
+        self.assertEqual(AES_KEY_SIZE, NONCE_LENGTH)
+        self.assertEqual(AES_KEY_SIZE, len(generate_nonce()))
 
     def test_digest(self):
         self.assertEqual(bytes.fromhex(self.DIGEST), compute_digest("", b"", b""))
