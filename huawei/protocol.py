@@ -183,7 +183,7 @@ class Packet:
         if len(data) < 1 + 2 + 1 + 2:
             raise ValueError("packet too short")
 
-        magic, _, _, payload, checksum = data[0], data[1:2], data[3], data[4:-2], data[-2:]
+        magic, _, payload, checksum = data[0], data[1:3], data[4:-2], data[-2:]
 
         if magic != ord(HUAWEI_LPV2_MAGIC):
             raise ValueError(f"magic mismatch: {magic} != {HUAWEI_LPV2_MAGIC}")
