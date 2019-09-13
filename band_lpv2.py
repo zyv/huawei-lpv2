@@ -92,7 +92,7 @@ class Band:
         if self.state == BandState.RequestedLinkParams:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.LinkParams.id:
                 raise RuntimeError("unexpected packet")
-            self._parse_link_params(packet.command)
+            self._process_link_params(packet.command)
         elif self.state == BandState.RequestedAuthentication:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.Auth.id:
                 raise RuntimeError("unexpected packet")
@@ -155,7 +155,7 @@ class Band:
         self.state = BandState.RequestedLinkParams
         return huawei.commands.request_link_params()
 
-    def _parse_link_params(self, command: Command):
+    def _process_link_params(self, command: Command):
         self.link_params, self.server_nonce = huawei.commands.process_link_params(command)
         self.state = BandState.ReceivedLinkParams
 
