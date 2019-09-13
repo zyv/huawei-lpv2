@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import math
 import secrets
+from functools import wraps
 from typing import List, Optional
 
 from cryptography.hazmat.backends import default_backend
@@ -200,6 +201,17 @@ class Packet:
 
     def decrypt(self, key: bytes, iv: bytes) -> "Packet":
         return Packet(service_id=self.service_id, command_id=self.command_id, command=self.command.decrypt(key, iv))
+
+
+def encrypt_packet(request):
+    @wraps(request)
+    def wrapper(*args, **kwargs):
+        if not all(arg in kwargs for arg in ("key", "iv")):
+            raise TypeError("encrypt_packet expects 'key' and 'iv' arguments")
+        key, iv = kwargs.pop("key"), kwargs.pop("iv")
+        return request(*args, **kwargs).encrypt(key, iv)
+
+    return wrapper
 
 
 def compute_digest(message: str, client_nonce: bytes, server_nonce: bytes):

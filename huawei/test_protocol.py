@@ -1,7 +1,8 @@
 import unittest
 
 from .protocol import AES_KEY_SIZE, Command, HUAWEI_LPV2_MAGIC, NONCE_LENGTH, Packet, TLV, VarInt, compute_digest, \
-    create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, encrypt, generate_nonce, hexlify
+    create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, encrypt, encrypt_packet, generate_nonce, \
+    hexlify
 from .services import CryptoTags
 
 
@@ -12,6 +13,13 @@ class TestUtils(unittest.TestCase):
 
     def test_int_encoding(self):
         self.assertEqual(list(range(1000)), [decode_int(encode_int(i)) for i in range(1000)])
+
+    def test_encrypt_packet(self):
+        self.assertRaises(TypeError, encrypt_packet(lambda: TestPacket.PACKET))
+
+        key, iv = generate_nonce(), generate_nonce()
+        packet = encrypt_packet(lambda: TestPacket.PACKET)(key=key, iv=iv)
+        self.assertEqual(packet.decrypt(key, iv), TestPacket.PACKET)
 
 
 class TestVarInt(unittest.TestCase):
