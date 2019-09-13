@@ -195,6 +195,12 @@ class Packet:
 
         return Packet(service_id=payload[0], command_id=payload[1], command=Command.from_bytes(payload[2:]))
 
+    def encrypt(self, key: bytes, iv: bytes) -> "Packet":
+        return Packet(service_id=self.service_id, command_id=self.command_id, command=self.command.encrypt(key, iv))
+
+    def decrypt(self, key: bytes, iv: bytes) -> "Packet":
+        return Packet(service_id=self.service_id, command_id=self.command_id, command=self.command.decrypt(key, iv))
+
 
 def compute_digest(message: str, client_nonce: bytes, server_nonce: bytes):
     complete_nonce = server_nonce + client_nonce

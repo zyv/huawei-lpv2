@@ -118,6 +118,13 @@ class TestPacket(unittest.TestCase):
     def test_serialization(self):
         self.assertEqual(bytes.fromhex(self.DATA), bytes(self.PACKET))
 
+    def test_crypto(self):
+        key, iv = generate_nonce(), generate_nonce()
+        encrypted_command = self.PACKET.command.encrypt(key, iv)
+        encrypted_packet = self.PACKET.encrypt(key, iv)
+        self.assertEqual(encrypted_command, encrypted_packet.command)
+        self.assertEqual(self.PACKET, encrypted_packet.decrypt(key, iv))
+
 
 class TestCrypto(unittest.TestCase):
     MAC_ADDRESS = "FF:FF:FF:FF:FF:CC"
