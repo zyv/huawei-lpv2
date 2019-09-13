@@ -100,7 +100,7 @@ class Band:
         elif self.state == BandState.RequestedBondParams:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.BondParams.id:
                 raise RuntimeError("unexpected packet")
-            self._parse_bond_params(packet.command)
+            self._process_bond_params(packet.command)
         elif self.state == BandState.RequestedBond:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.Bond.id:
                 raise RuntimeError("unexpected packet")
@@ -171,7 +171,7 @@ class Band:
         self.state = BandState.RequestedBondParams
         return huawei.commands.request_bond_params(self.client_serial, self.client_mac)
 
-    def _parse_bond_params(self, command: Command):
+    def _process_bond_params(self, command: Command):
         self.link_params.max_frame_size, self.encryption_counter = huawei.commands.process_bond_params(command)
         self.state = BandState.ReceivedBondParams
 
