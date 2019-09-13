@@ -11,8 +11,7 @@ from pathlib import Path
 from bleak import BleakClient
 
 import huawei.commands
-from huawei.protocol import AUTH_VERSION, Command, ENCRYPTION_COUNTER_MAX, NONCE_LENGTH, PROTOCOL_VERSION, Packet, \
-    decode_int, digest_response, encode_int, generate_nonce, hexlify
+from huawei.protocol import Command, ENCRYPTION_COUNTER_MAX, Packet, decode_int, encode_int, generate_nonce, hexlify
 from huawei.services import DeviceConfig, MeasurementSystem, TAG_RESULT
 
 DEVICE_NAME = "default"
@@ -51,9 +50,7 @@ class Band:
 
         self.client_serial = client_mac.replace(":", "")[-6:]  # android.os.Build.SERIAL
 
-        self.max_frame_size = 254
-        self.max_link_size = 254
-        self.connection_interval = 10  # milliseconds
+        self.link_params = None
 
         self.server_nonce = None
         self.client_nonce = generate_nonce()
@@ -159,36 +156,7 @@ class Band:
         return huawei.commands.request_link_params()
 
     def _parse_link_params(self, command: Command):
-        if TAG_RESULT in command:
-            raise RuntimeError("link parameter negotiation failed")
-
-        protocol_version = decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)
-        self.max_frame_size = decode_int(command[DeviceConfig.LinkParams.Tags.MaxFrameSize].value)
-        self.max_link_size = decode_int(command[DeviceConfig.LinkParams.Tags.MaxLinkSize].value)
-        self.connection_interval = decode_int(command[DeviceConfig.LinkParams.Tags.ConnectionInterval].value)
-
-        auth_version = decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])
-        self.server_nonce = bytes(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[2:18])
-
-        # TODO: optional path extend number parsing
-
-        if protocol_version != PROTOCOL_VERSION:
-            raise RuntimeError(f"protocol version mismatch: {protocol_version} != {PROTOCOL_VERSION}")
-
-        if auth_version != AUTH_VERSION:
-            raise RuntimeError(f"authentication scheme version mismatch: {auth_version} != {AUTH_VERSION}")
-
-        if len(self.server_nonce) != NONCE_LENGTH:
-            raise RuntimeError(f"server nonce length mismatch: {len(self.server_nonce)} != {NONCE_LENGTH}")
-
-        logger.info(
-            f"Negotiated link parameters: "
-            f"{self.max_frame_size}, "
-            f"{self.max_link_size}, "
-            f"{self.connection_interval}, "
-            f"{hexlify(self.server_nonce)}",
-        )
-
+        self.link_params, self.server_nonce = huawei.commands.process_link_params(command)
         self.state = BandState.ReceivedLinkParams
 
     def _request_authentication(self):

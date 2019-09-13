@@ -1,6 +1,11 @@
-from huawei.protocol import AUTH_VERSION, Command, Packet, TLV, create_bonding_key, digest_challenge, digest_response, \
-    encode_int
-from huawei.services import DeviceConfig, LocaleConfig
+from dataclasses import dataclass
+from logging import getLogger
+
+from huawei.protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, TLV, create_bonding_key, \
+    decode_int, digest_challenge, digest_response, encode_int, hexlify
+from huawei.services import DeviceConfig, LocaleConfig, TAG_RESULT
+
+logger = getLogger(__name__)
 
 
 def request_link_params() -> Packet:
@@ -14,6 +19,49 @@ def request_link_params() -> Packet:
             TLV(DeviceConfig.LinkParams.Tags.ConnectionInterval),
         ]),
     )
+
+
+@dataclass
+class LinkParams:
+    max_frame_size: int
+    max_link_size: int
+    connection_interval: int  # milliseconds
+
+
+def process_link_params(command: Command) -> (LinkParams, bytes):
+    if TAG_RESULT in command:
+        raise RuntimeError("link parameter negotiation failed")
+
+    link_params = LinkParams(
+        max_frame_size=decode_int(command[DeviceConfig.LinkParams.Tags.MaxFrameSize].value),
+        max_link_size=decode_int(command[DeviceConfig.LinkParams.Tags.MaxLinkSize].value),
+        connection_interval=decode_int(command[DeviceConfig.LinkParams.Tags.ConnectionInterval].value),
+    )
+
+    protocol_version = decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)
+    auth_version = decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])
+    server_nonce = bytes(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[2:18])
+
+    # TODO: optional path extend number parsing
+
+    if protocol_version != PROTOCOL_VERSION:
+        raise RuntimeError(f"protocol version mismatch: {protocol_version} != {PROTOCOL_VERSION}")
+
+    if auth_version != AUTH_VERSION:
+        raise RuntimeError(f"authentication scheme version mismatch: {auth_version} != {AUTH_VERSION}")
+
+    if len(server_nonce) != NONCE_LENGTH:
+        raise RuntimeError(f"server nonce length mismatch: {len(server_nonce)} != {NONCE_LENGTH}")
+
+    logger.info(
+        f"Negotiated link parameters: "
+        f"{link_params.max_frame_size}, "
+        f"{link_params.max_link_size}, "
+        f"{link_params.connection_interval}, "
+        f"{hexlify(server_nonce)}",
+    )
+
+    return link_params, server_nonce
 
 
 def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
