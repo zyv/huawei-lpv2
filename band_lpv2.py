@@ -18,7 +18,7 @@ from huawei.services import DeviceConfig, MeasurementSystem, TAG_RESULT
 DEVICE_NAME = "default"
 
 logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger("lpv2")
+logger = logging.getLogger(__name__)
 
 CONFIG_FILE = Path("band.ini")
 
