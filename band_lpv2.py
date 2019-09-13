@@ -89,19 +89,19 @@ class Band:
         logger.debug(f"Parsed: {packet}")
 
         if self.state == BandState.RequestedLinkParams:
-            if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.LinkParams.id:
+            if (packet.service_id, packet.command_id) != (DeviceConfig.id, DeviceConfig.LinkParams.id):
                 raise RuntimeError("unexpected packet")
             self._process_link_params(packet.command)
         elif self.state == BandState.RequestedAuthentication:
-            if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.Auth.id:
+            if (packet.service_id, packet.command_id) != (DeviceConfig.id, DeviceConfig.Auth.id):
                 raise RuntimeError("unexpected packet")
             self._process_authentication(packet.command)
         elif self.state == BandState.RequestedBondParams:
-            if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.BondParams.id:
+            if (packet.service_id, packet.command_id) != (DeviceConfig.id, DeviceConfig.BondParams.id):
                 raise RuntimeError("unexpected packet")
             self._process_bond_params(packet.command)
         elif self.state == BandState.RequestedBond:
-            if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.Bond.id:
+            if (packet.service_id, packet.command_id) != (DeviceConfig.id, DeviceConfig.Bond.id):
                 raise RuntimeError("unexpected packet")
             self._process_bond(packet.command)
 
