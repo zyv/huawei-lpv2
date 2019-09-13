@@ -196,7 +196,7 @@ class Band:
         return huawei.commands.request_authentication(client_nonce=self.client_nonce, server_nonce=self.server_nonce)
 
     def _parse_authentication(self, command: Command):
-        expected_answer = digest_response(self.server_nonce, self.client_nonce)
+        expected_answer = digest_response(self.client_nonce, self.server_nonce)
         provided_answer = command[DeviceConfig.Auth.Tags.Challenge].value
 
         if expected_answer != provided_answer:

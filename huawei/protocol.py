@@ -196,7 +196,7 @@ class Packet:
         return Packet(service_id=payload[0], command_id=payload[1], command=Command.from_bytes(payload[2:]))
 
 
-def compute_digest(message: str, server_nonce: bytes, client_nonce: bytes):
+def compute_digest(message: str, client_nonce: bytes, server_nonce: bytes):
     complete_nonce = server_nonce + client_nonce
 
     def digest(key: bytes, msg: bytes):
@@ -205,12 +205,12 @@ def compute_digest(message: str, server_nonce: bytes, client_nonce: bytes):
     return digest(digest(bytes.fromhex(DIGEST_SECRET + message), complete_nonce), complete_nonce)
 
 
-def digest_challenge(server_nonce: bytes, client_nonce: bytes):
-    return compute_digest(MESSAGE_CHALLENGE, server_nonce, client_nonce)
+def digest_challenge(client_nonce: bytes, server_nonce: bytes):
+    return compute_digest(MESSAGE_CHALLENGE, client_nonce, server_nonce)
 
 
-def digest_response(server_nonce: bytes, client_nonce: bytes):
-    return compute_digest(MESSAGE_RESPONSE, server_nonce, client_nonce)
+def digest_response(client_nonce: bytes, server_nonce: bytes):
+    return compute_digest(MESSAGE_RESPONSE, client_nonce, server_nonce)
 
 
 def generate_nonce() -> bytes:

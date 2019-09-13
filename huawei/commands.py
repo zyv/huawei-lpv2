@@ -20,7 +20,7 @@ def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.Auth.id,
         command=Command(tlvs=[
-            TLV(tag=DeviceConfig.Auth.Tags.Challenge, value=digest_challenge(server_nonce, client_nonce)),
+            TLV(tag=DeviceConfig.Auth.Tags.Challenge, value=digest_challenge(client_nonce, server_nonce)),
             TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(AUTH_VERSION) + client_nonce)),
         ]),
     )
