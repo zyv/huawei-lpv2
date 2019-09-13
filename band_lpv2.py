@@ -193,15 +193,10 @@ class Band:
 
     def _request_authentication(self):
         self.state = BandState.RequestedAuthentication
-        return huawei.commands.request_authentication(client_nonce=self.client_nonce, server_nonce=self.server_nonce)
+        return huawei.commands.request_authentication(self.client_nonce, self.server_nonce)
 
     def _parse_authentication(self, command: Command):
-        expected_answer = digest_response(self.client_nonce, self.server_nonce)
-        provided_answer = command[DeviceConfig.Auth.Tags.Challenge].value
-
-        if expected_answer != provided_answer:
-            raise RuntimeError(f"wrong answer to provided challenge: {expected_answer} != {provided_answer}")
-
+        huawei.commands.parse_authentication(self.client_nonce, self.server_nonce, command)
         self.state = BandState.ReceivedAuthentication
 
     def _request_bond_params(self):

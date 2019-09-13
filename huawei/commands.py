@@ -1,4 +1,5 @@
-from huawei.protocol import AUTH_VERSION, Command, Packet, TLV, create_bonding_key, digest_challenge, encode_int
+from huawei.protocol import AUTH_VERSION, Command, Packet, TLV, create_bonding_key, digest_challenge, digest_response, \
+    encode_int
 from huawei.services import DeviceConfig, LocaleConfig
 
 
@@ -24,6 +25,14 @@ def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
             TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(AUTH_VERSION) + client_nonce)),
         ]),
     )
+
+
+def parse_authentication(client_nonce: bytes, server_nonce: bytes, command: Command):
+    expected_answer = digest_response(client_nonce, server_nonce)
+    provided_answer = command[DeviceConfig.Auth.Tags.Challenge].value
+
+    if expected_answer != provided_answer:
+        raise RuntimeError(f"wrong answer to provided challenge: {expected_answer} != {provided_answer}")
 
 
 def request_bond_params(client_serial: str, client_mac: str) -> Packet:
