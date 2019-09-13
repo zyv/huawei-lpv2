@@ -103,7 +103,7 @@ class Band:
         elif self.state == BandState.RequestedBond:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.Bond.id:
                 raise RuntimeError("unexpected packet")
-            self._parse_bond(packet.command)
+            self._process_bond(packet.command)
 
         self._event.set()
 
@@ -179,7 +179,7 @@ class Band:
         self.state = BandState.RequestedBond
         return huawei.commands.request_bond(self.client_serial, self.device_mac, self.secret, self._next_iv())
 
-    def _parse_bond(self, command):
+    def _process_bond(self, command):
         if TAG_RESULT in command:
             raise RuntimeError("bond negotiation failed")
 
