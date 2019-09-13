@@ -113,6 +113,30 @@ def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> 
     )
 
 
+def process_bond_params(command: Command) -> Tuple[int, int]:
+    if TAG_RESULT in command:
+        raise RuntimeError("bond parameter negotiation failed")
+
+    bond_status = decode_int(command[DeviceConfig.BondParams.Tags.Status].value)
+    bond_status_info = decode_int(command[DeviceConfig.BondParams.Tags.StatusInfo].value)
+    bt_version = decode_int(command[DeviceConfig.BondParams.Tags.BTVersion].value)
+    max_frame_size = decode_int(command[DeviceConfig.BondParams.Tags.MaxFrameSize].value)
+    encryption_counter = decode_int(command[DeviceConfig.BondParams.Tags.EncryptionCounter].value)
+
+    # TODO: check bond status
+
+    logger.info(
+        f"Negotiated bond params: "
+        f"{bond_status}, "
+        f"{bond_status_info}, "
+        f"{bt_version}, "
+        f"{max_frame_size}, "
+        f"{encryption_counter}",
+    )
+
+    return max_frame_size, encryption_counter
+
+
 def request_set_time(timestamp: float, offset_hours: int, offset_minutes: int, key: bytes, iv: bytes) -> Packet:
     offset = encode_int(offset_hours, length=1) + encode_int(offset_minutes, length=1)
 

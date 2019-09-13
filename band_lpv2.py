@@ -172,24 +172,7 @@ class Band:
         return huawei.commands.request_bond_params(self.client_serial, self.client_mac)
 
     def _parse_bond_params(self, command: Command):
-        if TAG_RESULT in command:
-            raise RuntimeError("bond parameter negotiation failed")
-
-        self.bond_status = decode_int(command[DeviceConfig.BondParams.Tags.Status].value)
-        self.bond_status_info = decode_int(command[DeviceConfig.BondParams.Tags.StatusInfo].value)
-        self.bt_version = decode_int(command[DeviceConfig.BondParams.Tags.BTVersion].value)
-        self.max_frame_size = decode_int(command[DeviceConfig.BondParams.Tags.MaxFrameSize].value)
-        self.encryption_counter = decode_int(command[DeviceConfig.BondParams.Tags.EncryptionCounter].value)
-
-        logger.info(
-            f"Negotiated bond params: "
-            f"{self.bond_status}, "
-            f"{self.bond_status_info}, "
-            f"{self.bt_version}, "
-            f"{self.max_frame_size}, "
-            f"{self.encryption_counter}",
-        )
-
+        self.link_params.max_frame_size, self.encryption_counter = huawei.commands.process_bond_params(command)
         self.state = BandState.ReceivedBondParams
 
     def _request_bond(self):
