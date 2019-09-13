@@ -99,7 +99,7 @@ class Band:
         elif self.state == BandState.RequestedAuthentication:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.Auth.id:
                 raise RuntimeError("unexpected packet")
-            self._parse_authentication(packet.command)
+            self._process_authentication(packet.command)
         elif self.state == BandState.RequestedBondParams:
             if packet.service_id != DeviceConfig.id and packet.command_id != DeviceConfig.BondParams.id:
                 raise RuntimeError("unexpected packet")
@@ -195,8 +195,8 @@ class Band:
         self.state = BandState.RequestedAuthentication
         return huawei.commands.request_authentication(self.client_nonce, self.server_nonce)
 
-    def _parse_authentication(self, command: Command):
-        huawei.commands.parse_authentication(self.client_nonce, self.server_nonce, command)
+    def _process_authentication(self, command: Command):
+        huawei.commands.process_authentication(self.client_nonce, self.server_nonce, command)
         self.state = BandState.ReceivedAuthentication
 
     def _request_bond_params(self):

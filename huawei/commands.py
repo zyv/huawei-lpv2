@@ -27,7 +27,7 @@ def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
     )
 
 
-def parse_authentication(client_nonce: bytes, server_nonce: bytes, command: Command):
+def process_authentication(client_nonce: bytes, server_nonce: bytes, command: Command):
     expected_answer = digest_response(client_nonce, server_nonce)
     provided_answer = command[DeviceConfig.Auth.Tags.Challenge].value
 
