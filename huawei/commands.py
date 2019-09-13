@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from logging import getLogger
+from typing import Tuple
 
 from huawei.protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, TLV, create_bonding_key, \
     decode_int, digest_challenge, digest_response, encode_int, hexlify
@@ -28,7 +29,7 @@ class LinkParams:
     connection_interval: int  # milliseconds
 
 
-def process_link_params(command: Command) -> (LinkParams, bytes):
+def process_link_params(command: Command) -> Tuple[LinkParams, bytes]:
     if TAG_RESULT in command:
         raise RuntimeError("link parameter negotiation failed")
 
