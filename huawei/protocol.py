@@ -197,12 +197,12 @@ class Packet:
 
 
 def compute_digest(message: str, server_nonce: bytes, client_nonce: bytes):
-    nonce = server_nonce + client_nonce
+    complete_nonce = server_nonce + client_nonce
 
     def digest(key: bytes, msg: bytes):
         return hmac.new(key, msg=msg, digestmod=hashlib.sha256).digest()
 
-    return digest(digest(bytes.fromhex(DIGEST_SECRET + message), nonce), nonce)
+    return digest(digest(bytes.fromhex(DIGEST_SECRET + message), complete_nonce), complete_nonce)
 
 
 def digest_challenge(server_nonce: bytes, client_nonce: bytes):
