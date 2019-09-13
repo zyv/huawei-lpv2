@@ -144,11 +144,11 @@ class Band:
         self.state = BandState.Disconnected
 
     async def set_time(self):
-        packet = huawei.commands.set_time(datetime.now(), self.secret, self._next_iv())
+        packet = huawei.commands.set_time(datetime.now(), key=self.secret, iv=self._next_iv())
         await self.send_data(self.client, packet)
 
     async def set_locale(self, language_tag: str = "en-US", measurement_system: int = MeasurementSystem.Metric):
-        packet = huawei.commands.set_locale(language_tag, measurement_system, self.secret, self._next_iv())
+        packet = huawei.commands.set_locale(language_tag, measurement_system, key=self.secret, iv=self._next_iv())
         await self.send_data(self.client, packet)
 
     def _request_link_params(self) -> Packet:
