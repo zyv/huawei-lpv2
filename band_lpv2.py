@@ -3,7 +3,6 @@ import base64
 import enum
 import logging
 import platform
-import time
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
@@ -11,7 +10,7 @@ from pathlib import Path
 from bleak import BleakClient
 
 import huawei.commands
-from huawei.protocol import Command, ENCRYPTION_COUNTER_MAX, Packet, decode_int, encode_int, generate_nonce, hexlify
+from huawei.protocol import Command, ENCRYPTION_COUNTER_MAX, Packet, encode_int, generate_nonce, hexlify
 from huawei.services import DeviceConfig, MeasurementSystem, TAG_RESULT
 
 DEVICE_NAME = "default"
@@ -145,7 +144,8 @@ class Band:
         self.state = BandState.Disconnected
 
     async def set_time(self):
-        await self.send_data(self.client, self._request_set_time())
+        packet = huawei.commands.set_time(datetime.now(), self.secret, self._next_iv())
+        await self.send_data(self.client, packet)
 
     async def set_locale(self, language_tag: str = "en-US", measurement_system: int = MeasurementSystem.Metric):
         packet = huawei.commands.set_locale(language_tag, measurement_system, self.secret, self._next_iv())
@@ -184,17 +184,6 @@ class Band:
             raise RuntimeError("bond negotiation failed")
 
         self.state = BandState.ReceivedBond
-
-    def _request_set_time(self):
-        ts = time.time()
-
-        utc_offset = (datetime.fromtimestamp(ts) - datetime.utcfromtimestamp(ts)).total_seconds() / 3600
-        float_hours, float_minutes = divmod(utc_offset, 1)
-
-        offset_hours = int(abs(float_hours) + 128) if float_hours < 0 else int(float_hours)
-        offset_minutes = int(abs(float_minutes * 60))
-
-        return huawei.commands.request_set_time(ts, offset_hours, offset_minutes, self.secret, self._next_iv())
 
 
 async def run(config, loop):

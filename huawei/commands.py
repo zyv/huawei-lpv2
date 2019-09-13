@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from logging import getLogger
 from typing import Tuple
 
@@ -137,17 +138,26 @@ def process_bond_params(command: Command) -> Tuple[int, int]:
     return max_frame_size, encryption_counter
 
 
-def request_set_time(timestamp: float, offset_hours: int, offset_minutes: int, key: bytes, iv: bytes) -> Packet:
-    offset = encode_int(offset_hours, length=1) + encode_int(offset_minutes, length=1)
+def set_time(moment: datetime, key: bytes, iv: bytes) -> Packet:
+    def request_set_time(timestamp: float, zone_hours: int, zone_minutes: int, key: bytes, iv: bytes) -> Packet:
+        zone_offset = encode_int(zone_hours, length=1) + encode_int(zone_minutes, length=1)
 
-    return Packet(
-        service_id=DeviceConfig.id,
-        command_id=DeviceConfig.SetTime.id,
-        command=Command(tlvs=[
-            TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(timestamp), length=4)),
-            TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=offset),
-        ]).encrypt(key, iv),
-    )
+        return Packet(
+            service_id=DeviceConfig.id,
+            command_id=DeviceConfig.SetTime.id,
+            command=Command(tlvs=[
+                TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(timestamp), length=4)),
+                TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=zone_offset),
+            ]).encrypt(key, iv),
+        )
+
+    offset = (moment - datetime.utcfromtimestamp(moment.timestamp())).total_seconds() / 3600
+    float_hours, float_minutes = divmod(offset, 1)
+
+    offset_hours = int(abs(float_hours) + 128) if float_hours < 0 else int(float_hours)
+    offset_minutes = int(abs(float_minutes * 60))
+
+    return request_set_time(moment.timestamp(), offset_hours, offset_minutes, key, iv)
 
 
 def set_locale(language_tag: str, measurement_system: int, key: bytes, iv: bytes) -> Packet:
