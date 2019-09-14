@@ -9,9 +9,11 @@ from pathlib import Path
 
 from bleak import BleakClient
 
-import huawei.commands
 from huawei.protocol import Command, ENCRYPTION_COUNTER_MAX, Packet, encode_int, generate_nonce, hexlify
-from huawei.services import DeviceConfig, MeasurementSystem, TAG_RESULT
+from huawei.services import TAG_RESULT
+from huawei.services import device_config
+from huawei.services import locale_config
+from huawei.services.device_config import DeviceConfig
 
 DEVICE_NAME = "default"
 
@@ -144,40 +146,41 @@ class Band:
         self.state = BandState.Disconnected
 
     async def set_time(self):
-        packet = huawei.commands.set_time(datetime.now(), key=self.secret, iv=self._next_iv())
+        packet = device_config.set_time(datetime.now(), key=self.secret, iv=self._next_iv())
         await self.send_data(self.client, packet)
 
-    async def set_locale(self, language_tag: str = "en-US", measurement_system: int = MeasurementSystem.Metric):
-        packet = huawei.commands.set_locale(language_tag, measurement_system, key=self.secret, iv=self._next_iv())
+    async def set_locale(self, language_tag: str = "en-US",
+                         measurement_system: int = locale_config.MeasurementSystem.Metric):
+        packet = locale_config.set_locale(language_tag, measurement_system, key=self.secret, iv=self._next_iv())
         await self.send_data(self.client, packet)
 
     def _request_link_params(self) -> Packet:
         self.state = BandState.RequestedLinkParams
-        return huawei.commands.request_link_params()
+        return device_config.request_link_params()
 
     def _process_link_params(self, command: Command):
-        self.link_params, self.server_nonce = huawei.commands.process_link_params(command)
+        self.link_params, self.server_nonce = device_config.process_link_params(command)
         self.state = BandState.ReceivedLinkParams
 
     def _request_authentication(self):
         self.state = BandState.RequestedAuthentication
-        return huawei.commands.request_authentication(self.client_nonce, self.server_nonce)
+        return device_config.request_authentication(self.client_nonce, self.server_nonce)
 
     def _process_authentication(self, command: Command):
-        huawei.commands.process_authentication(self.client_nonce, self.server_nonce, command)
+        device_config.process_authentication(self.client_nonce, self.server_nonce, command)
         self.state = BandState.ReceivedAuthentication
 
     def _request_bond_params(self):
         self.state = BandState.RequestedBondParams
-        return huawei.commands.request_bond_params(self.client_serial, self.client_mac)
+        return device_config.request_bond_params(self.client_serial, self.client_mac)
 
     def _process_bond_params(self, command: Command):
-        self.link_params.max_frame_size, self.encryption_counter = huawei.commands.process_bond_params(command)
+        self.link_params.max_frame_size, self.encryption_counter = device_config.process_bond_params(command)
         self.state = BandState.ReceivedBondParams
 
     def _request_bond(self):
         self.state = BandState.RequestedBond
-        return huawei.commands.request_bond(self.client_serial, self.device_mac, self.secret, self._next_iv())
+        return device_config.request_bond(self.client_serial, self.device_mac, self.secret, self._next_iv())
 
     def _process_bond(self, command):
         if TAG_RESULT in command:

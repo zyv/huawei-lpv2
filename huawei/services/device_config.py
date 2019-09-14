@@ -3,11 +3,73 @@ from datetime import datetime
 from logging import getLogger
 from typing import Tuple
 
-from huawei.protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, TLV, create_bonding_key, \
+from . import TAG_RESULT
+from ..protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, TLV, create_bonding_key, \
     decode_int, digest_challenge, digest_response, encode_int, encrypt_packet, hexlify
-from huawei.services import DeviceConfig, LocaleConfig, TAG_RESULT
 
 logger = getLogger(__name__)
+
+
+class DeviceConfig:
+    id = 1
+
+    class LinkParams:
+        id = 1
+
+        class Tags:
+            ProtocolVersion = 1
+            MaxFrameSize = 2
+            MaxLinkSize = 3
+            ConnectionInterval = 4
+            ServerNonce = 5
+            PathExtendNumber = 6  # apparently used for BTVersion == 0
+
+    class SetTime:
+        id = 5
+
+        class Tags:
+            Timestamp = 1
+            ZoneOffset = 2
+
+    class ProductType:
+        id = 7
+
+        class Tags:
+            ProductType = 2  # for request
+            HardwareVersion = 3
+            SoftwareVersion = 7
+            SerialNumber = 9
+            ProductModel = 12
+
+    class Bond:
+        id = 14
+
+        class Tags:
+            BondRequest = 1
+            Status = 2
+            RequestCode = 3
+            ClientSerial = 5
+            BondingKey = 6
+            InitVector = 7
+
+    class BondParams:
+        id = 15
+
+        class Tags:
+            Status = 1
+            StatusInfo = 2
+            ClientSerial = 3
+            BTVersion = 4
+            MaxFrameSize = 5
+            ClientMacAddress = 7
+            EncryptionCounter = 9
+
+    class Auth:
+        id = 19
+
+        class Tags:
+            Challenge = 1
+            Nonce = 2
 
 
 def request_link_params() -> Packet:
@@ -159,15 +221,3 @@ def set_time(moment: datetime) -> Packet:
     offset_minutes = int(abs(float_minutes * 60))
 
     return request_set_time(moment.timestamp(), offset_hours, offset_minutes)
-
-
-@encrypt_packet
-def set_locale(language_tag: str, measurement_system: int) -> Packet:
-    return Packet(
-        service_id=LocaleConfig.id,
-        command_id=LocaleConfig.SetLocale.id,
-        command=Command(tlvs=[
-            TLV(tag=LocaleConfig.SetLocale.Tags.LanguageTag, value=language_tag.encode()),
-            TLV(tag=LocaleConfig.SetLocale.Tags.MeasurementSystem, value=encode_int(measurement_system, length=1)),
-        ]),
-    )
