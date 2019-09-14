@@ -69,23 +69,23 @@ class Band:
         self.encryption_counter += 1
         return generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
 
-    async def wait_for_state(self, state: BandState):
+    async def _wait_for_state(self, state: BandState):
         logger.debug(f"Waiting for state: {state}...")
         await self._event.wait()
         if self.state != state:
             raise RuntimeError(f"bad state: {self.state} != {state}")
         logger.debug(f"Response received, state {state} attained!")
 
-    def send_data(self, client: BleakClient, packet: Packet, requires_response: bool = True):
+    def _send_data(self, packet: Packet, requires_response: bool = True):
         data = bytes(packet)
         logger.debug(f"State: {self.state}, sending: {hexlify(data)}")
 
         if requires_response:
             self._event.clear()
 
-        return client.write_gatt_char(GATT_WRITE, data)
+        return self.client.write_gatt_char(GATT_WRITE, data)
 
-    def receive_data(self, sender, data):
+    def _receive_data(self, sender, data):
         logger.debug(f"State: {self.state}, received from '{sender}': {hexlify(bytes(data))}")
         packet = Packet.from_bytes(data)
         logger.debug(f"Parsed: {packet}")
@@ -119,24 +119,24 @@ class Band:
 
         logger.info(f"State: {self.state}")
 
-        await self.client.start_notify(GATT_READ, self.receive_data)
+        await self.client.start_notify(GATT_READ, self._receive_data)
 
     async def connect(self):
-        await self.send_data(self.client, self._request_link_params())
+        await self._send_data(self._request_link_params())
 
-        await self.wait_for_state(BandState.ReceivedLinkParams)
+        await self._wait_for_state(BandState.ReceivedLinkParams)
 
-        await self.send_data(self.client, self._request_authentication())
+        await self._send_data(self._request_authentication())
 
-        await self.wait_for_state(BandState.ReceivedAuthentication)
+        await self._wait_for_state(BandState.ReceivedAuthentication)
 
-        await self.send_data(self.client, self._request_bond_params())
+        await self._send_data(self._request_bond_params())
 
-        await self.wait_for_state(BandState.ReceivedBondParams)
+        await self._wait_for_state(BandState.ReceivedBondParams)
 
-        await self.send_data(self.client, self._request_bond())  # TODO: not needed if status is already correct
+        await self._send_data(self._request_bond())  # TODO: not needed if status is already correct
 
-        await self.wait_for_state(BandState.ReceivedBond)
+        await self._wait_for_state(BandState.ReceivedBond)
 
     async def disconnect(self):
         await asyncio.sleep(0.5)
@@ -147,12 +147,12 @@ class Band:
 
     async def set_time(self):
         packet = device_config.set_time(datetime.now(), key=self.secret, iv=self._next_iv())
-        await self.send_data(self.client, packet)
+        await self._send_data(packet)
 
     async def set_locale(self, language_tag: str = "en-US",
                          measurement_system: int = locale_config.MeasurementSystem.Metric):
         packet = locale_config.set_locale(language_tag, measurement_system, key=self.secret, iv=self._next_iv())
-        await self.send_data(self.client, packet)
+        await self._send_data(packet)
 
     def _request_link_params(self) -> Packet:
         self.state = BandState.RequestedLinkParams
