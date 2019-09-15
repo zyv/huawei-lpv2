@@ -3,9 +3,8 @@ from datetime import datetime
 from logging import getLogger
 from typing import Tuple
 
-from . import TAG_RESULT
-from ..protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, TLV, create_bonding_key, \
-    decode_int, digest_challenge, digest_response, encode_int, encrypt_packet, hexlify
+from ..protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, TLV, check_result, \
+    create_bonding_key, decode_int, digest_challenge, digest_response, encode_int, encrypt_packet, hexlify
 
 logger = getLogger(__name__)
 
@@ -92,10 +91,8 @@ class LinkParams:
     connection_interval: int  # milliseconds
 
 
+@check_result
 def process_link_params(command: Command) -> Tuple[LinkParams, bytes]:
-    if TAG_RESULT in command:
-        raise RuntimeError("link parameter negotiation failed")
-
     link_params = LinkParams(
         max_frame_size=decode_int(command[DeviceConfig.LinkParams.Tags.MaxFrameSize].value),
         max_link_size=decode_int(command[DeviceConfig.LinkParams.Tags.MaxLinkSize].value),
@@ -139,12 +136,13 @@ def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
     )
 
 
-def process_authentication(client_nonce: bytes, server_nonce: bytes, command: Command):
+@check_result
+def process_authentication(command: Command, client_nonce: bytes, server_nonce: bytes):
     expected_answer = digest_response(client_nonce, server_nonce)
     provided_answer = command[DeviceConfig.Auth.Tags.Challenge].value
 
     if expected_answer != provided_answer:
-        raise RuntimeError(f"wrong answer to provided challenge: {expected_answer} != {provided_answer}")
+        raise ValueError(f"wrong answer to provided challenge: {expected_answer} != {provided_answer}")
 
 
 def request_bond_params(client_serial: str, client_mac: str) -> Packet:
@@ -162,24 +160,8 @@ def request_bond_params(client_serial: str, client_mac: str) -> Packet:
     )
 
 
-def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> Packet:
-    return Packet(
-        service_id=DeviceConfig.id,
-        command_id=DeviceConfig.Bond.id,
-        command=Command(tlvs=[
-            TLV(tag=DeviceConfig.Bond.Tags.BondRequest),
-            TLV(tag=DeviceConfig.Bond.Tags.RequestCode, value=b"\x00"),
-            TLV(tag=DeviceConfig.Bond.Tags.ClientSerial, value=client_serial.encode()),
-            TLV(tag=DeviceConfig.Bond.Tags.BondingKey, value=create_bonding_key(device_mac, key, iv)),
-            TLV(tag=DeviceConfig.Bond.Tags.InitVector, value=iv),
-        ]),
-    )
-
-
+@check_result
 def process_bond_params(command: Command) -> Tuple[int, int]:
-    if TAG_RESULT in command:
-        raise RuntimeError("bond parameter negotiation failed")
-
     bond_status = decode_int(command[DeviceConfig.BondParams.Tags.Status].value)
     bond_status_info = decode_int(command[DeviceConfig.BondParams.Tags.StatusInfo].value)
     bt_version = decode_int(command[DeviceConfig.BondParams.Tags.BTVersion].value)
@@ -198,6 +180,20 @@ def process_bond_params(command: Command) -> Tuple[int, int]:
     )
 
     return max_frame_size, encryption_counter
+
+
+def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> Packet:
+    return Packet(
+        service_id=DeviceConfig.id,
+        command_id=DeviceConfig.Bond.id,
+        command=Command(tlvs=[
+            TLV(tag=DeviceConfig.Bond.Tags.BondRequest),
+            TLV(tag=DeviceConfig.Bond.Tags.RequestCode, value=b"\x00"),
+            TLV(tag=DeviceConfig.Bond.Tags.ClientSerial, value=client_serial.encode()),
+            TLV(tag=DeviceConfig.Bond.Tags.BondingKey, value=create_bonding_key(device_mac, key, iv)),
+            TLV(tag=DeviceConfig.Bond.Tags.InitVector, value=iv),
+        ]),
+    )
 
 
 @encrypt_packet

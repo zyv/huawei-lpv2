@@ -10,8 +10,8 @@ from typing import Callable, Optional, Tuple
 
 from bleak import BleakClient
 
-from huawei.protocol import Command, GATT_READ, GATT_WRITE, Packet, generate_nonce, hexlify, initialization_vector
-from huawei.services import TAG_RESULT
+from huawei.protocol import Command, GATT_READ, GATT_WRITE, Packet, check_result, generate_nonce, hexlify, \
+    initialization_vector
 from huawei.services import device_config
 from huawei.services import locale_config
 
@@ -140,13 +140,15 @@ class Band:
         self.state = BandState.Ready
         logger.info(f"Handshake completed, current state: {self.state}")
 
+    @check_result
     async def set_time(self):
         request = device_config.set_time(datetime.now(), **self._credentials())
-        await self._transact(request, lambda command: None)
+        return await self._transact(request, lambda _: _)
 
+    @check_result
     async def set_locale(self, language_tag: str, measurement_system: int):
         request = locale_config.set_locale(language_tag, measurement_system, **self._credentials())
-        await self._transact(request, lambda command: None)
+        return await self._transact(request, lambda _: _)
 
     def _process_link_params(self, command: Command):
         assert self.state == BandState.RequestedLinkParams, "bad state"
@@ -154,16 +156,16 @@ class Band:
 
     def _process_authentication(self, command: Command):
         assert self.state == BandState.RequestedAuthentication, "bad state"
-        device_config.process_authentication(self._client_nonce, self._server_nonce, command)
+        device_config.process_authentication(command, self._client_nonce, self._server_nonce)
 
     def _process_bond_params(self, command: Command):
         assert self.state == BandState.RequestedBondParams, "bad state"
         self.link_params.max_frame_size, self._encryption_counter = device_config.process_bond_params(command)
 
-    def _process_bond(self, command):
+    @check_result
+    def _process_bond(self, command: Command):
         assert self.state == BandState.RequestedBond, "bad state"
-        if TAG_RESULT in command:
-            raise RuntimeError("bond negotiation failed")
+        return command  # TLV(tag=2, value=bytes.fromhex('01'))
 
 
 async def run(config, loop):
