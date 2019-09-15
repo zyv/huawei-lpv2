@@ -6,7 +6,7 @@ import platform
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 from bleak import BleakClient
 
@@ -75,7 +75,7 @@ class Band:
         self.encryption_counter += 1
         return generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
 
-    async def _process_response(self, request: Packet, func: Callable, target_state: BandState = BandState.Ready):
+    async def _process_response(self, request: Packet, func: Callable, new_state: BandState):
         logger.debug(f"Waiting for response from service_id={request.service_id}, command_id={request.command_id}...")
 
         await self._event.wait()
@@ -84,22 +84,18 @@ class Band:
         assert (self._packet.service_id, self._packet.command_id) == (request.service_id, request.command_id)
         func(self._packet.command)
 
-        self.state, self._packet = target_state, None
+        self.state, self._packet = new_state, None
 
-        logger.debug(f"Response processed, attained request state: {self.state}")
+        logger.debug(f"Response processed, attained requested state: {self.state}")
 
-    def _send_data(self, packet: Packet, new_state: BandState = BandState.RequestedAck):
+    async def _send_data(self, packet: Packet, new_state: BandState):
         data = bytes(packet)
-        logger.debug(f"Current state: {self.state}, sending: {hexlify(data)}")
-
-        promise = self.client.write_gatt_char(GATT_WRITE, data)
+        logger.debug(f"Current state: {self.state}, target state: {new_state}, sending: {hexlify(data)}")
 
         self.state = new_state
-        logger.debug(f"Switched to requested state: {new_state}")
+        await self.client.write_gatt_char(GATT_WRITE, data)
 
-        return promise
-
-    def _receive_data(self, sender, data):
+    def _receive_data(self, sender: str, data: bytes):
         logger.debug(f"Current state: {self.state}, received from '{sender}': {hexlify(bytes(data))}")
         self._packet = Packet.from_bytes(data)
         logger.debug(f"Parsed received packet: {self._packet}")
@@ -117,23 +113,31 @@ class Band:
         self.state = BandState.Connected
         logger.info(f"Connected to band, current state: {self.state}")
 
+    async def _transact(self, request: Packet, func: Callable, states: Optional[Tuple[BandState, BandState]] = None):
+        source_state, target_state = states if states is not None else (BandState.RequestedAck, BandState.Ready)
+        await self._send_data(request, source_state)
+        await self._process_response(request, func, target_state)
+
     async def handshake(self):
-        packet = device_config.request_link_params()
-        await self._send_data(packet, BandState.RequestedLinkParams)
-        await self._process_response(packet, self._process_link_params, BandState.ReceivedLinkParams)
+        request = device_config.request_link_params()
+        states = (BandState.RequestedLinkParams, BandState.ReceivedLinkParams)
+        await self._transact(request, self._process_link_params, states)
 
-        packet = device_config.request_authentication(self.client_nonce, self.server_nonce)
-        await self._send_data(packet, BandState.RequestedAuthentication)
-        await self._process_response(packet, self._process_authentication, BandState.ReceivedAuthentication)
+        request = device_config.request_authentication(self.client_nonce, self.server_nonce)
+        states = (BandState.RequestedAuthentication, BandState.ReceivedAuthentication)
+        await self._transact(request, self._process_authentication, states)
 
-        packet = device_config.request_bond_params(self.client_serial, self.client_mac)
-        await self._send_data(packet, BandState.RequestedBondParams)
-        await self._process_response(packet, self._process_bond_params, BandState.ReceivedBondParams)
+        request = device_config.request_bond_params(self.client_serial, self.client_mac)
+        states = (BandState.RequestedBondParams, BandState.ReceivedBondParams)
+        await self._transact(request, self._process_bond_params, states)
 
         # TODO: not needed if status is already correct
-        packet = device_config.request_bond(self.client_serial, self.device_mac, self.secret, self._next_iv())
-        await self._send_data(packet, BandState.RequestedBond)
-        await self._process_response(packet, self._process_bond, BandState.ReceivedBond)
+        request = device_config.request_bond(self.client_serial, self.device_mac, self.secret, self._next_iv())
+        states = (BandState.RequestedBond, BandState.ReceivedBond)
+        await self._transact(request, self._process_bond, states)
+
+        self.state = BandState.Ready
+        logger.info(f"Handshake completed, current state: {self.state}")
 
     async def disconnect(self):
         self.state = BandState.Disconnected
@@ -142,14 +146,12 @@ class Band:
         logger.info(f"Stopped notifications, current state: {self.state}")
 
     async def set_time(self):
-        packet = device_config.set_time(datetime.now(), key=self.secret, iv=self._next_iv())
-        await self._send_data(packet)
-        await self._process_response(packet, lambda command: None)
+        request = device_config.set_time(datetime.now(), key=self.secret, iv=self._next_iv())
+        await self._transact(request, lambda command: None)
 
     async def set_locale(self, language_tag: str, measurement_system: int):
-        packet = locale_config.set_locale(language_tag, measurement_system, key=self.secret, iv=self._next_iv())
-        await self._send_data(packet)
-        await self._process_response(packet, lambda command: None)
+        request = locale_config.set_locale(language_tag, measurement_system, key=self.secret, iv=self._next_iv())
+        await self._transact(request, lambda command: None)
 
     def _process_link_params(self, command: Command):
         assert self.state == BandState.RequestedLinkParams, "bad state"
