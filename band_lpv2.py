@@ -10,8 +10,7 @@ from typing import Callable, Optional, Tuple
 
 from bleak import BleakClient
 
-from huawei.protocol import Command, ENCRYPTION_COUNTER_MAX, GATT_READ, GATT_WRITE, Packet, encode_int, \
-    generate_nonce, hexlify
+from huawei.protocol import Command, GATT_READ, GATT_WRITE, Packet, generate_nonce, hexlify, initialization_vector
 from huawei.services import TAG_RESULT
 from huawei.services import device_config
 from huawei.services import locale_config
@@ -43,35 +42,33 @@ class BandState(enum.Enum):
 
 
 class Band:
-    def __init__(self, client: BleakClient, client_mac: str, device_mac: str, secret: bytes, loop):
+    def __init__(self, loop, client: BleakClient, client_mac: str, device_mac: str, key: bytes):
         self.state: BandState = BandState.Disconnected
 
         self.client: BleakClient = client
-        self.client_mac: str = client_mac
-        self.device_mac: str = device_mac
-        self.secret: bytes = secret
         self.loop = loop
 
+        self.client_mac: str = client_mac
+        self.device_mac: str = device_mac
         self.client_serial: str = client_mac.replace(":", "")[-6:]  # android.os.Build.SERIAL
 
-        self.link_params: Optional[device_config.LinkParams] = None
+        self._key: bytes = key
+        self._server_nonce: Optional[bytes] = None
+        self._client_nonce: bytes = generate_nonce()
+        self._encryption_counter: int = 0
 
-        self.server_nonce: Optional[bytes] = None
-        self.client_nonce: bytes = generate_nonce()
+        self.link_params: Optional[device_config.LinkParams] = None
 
         self.bond_status: Optional[int] = None
         self.bond_status_info: Optional[int] = None
         self.bt_version: Optional[int] = None
-        self.encryption_counter: int = 0
 
         self._packet: Optional[Packet] = None
         self._event = asyncio.Event()
 
-    def _next_iv(self):
-        if self.encryption_counter == ENCRYPTION_COUNTER_MAX:
-            self.encryption_counter = 1
-        self.encryption_counter += 1
-        return generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
+    def _credentials(self):
+        self._encryption_counter, iv = initialization_vector(self._encryption_counter)
+        return {"key": self._key, "iv": iv}
 
     async def _process_response(self, request: Packet, func: Callable, new_state: BandState):
         logger.debug(f"Waiting for response from service_id={request.service_id}, command_id={request.command_id}...")
@@ -88,6 +85,7 @@ class Band:
 
     async def _send_data(self, packet: Packet, new_state: BandState):
         data = bytes(packet)
+        logger.debug(f"Request packet: {packet}")
         logger.debug(f"Current state: {self.state}, target state: {new_state}, sending: {hexlify(data)}")
 
         self.state = new_state
@@ -96,7 +94,7 @@ class Band:
     def _receive_data(self, sender: str, data: bytes):
         logger.debug(f"Current state: {self.state}, received from '{sender}': {hexlify(bytes(data))}")
         self._packet = Packet.from_bytes(data)
-        logger.debug(f"Parsed received packet: {self._packet}")
+        logger.debug(f"Parsed response packet: {self._packet}")
 
         assert self.state.name.startswith("Requested"), "unexpected packet"
         self._event.set()
@@ -121,7 +119,7 @@ class Band:
         states = (BandState.RequestedLinkParams, BandState.ReceivedLinkParams)
         await self._transact(request, self._process_link_params, states)
 
-        request = device_config.request_authentication(self.client_nonce, self.server_nonce)
+        request = device_config.request_authentication(self._client_nonce, self._server_nonce)
         states = (BandState.RequestedAuthentication, BandState.ReceivedAuthentication)
         await self._transact(request, self._process_authentication, states)
 
@@ -130,7 +128,7 @@ class Band:
         await self._transact(request, self._process_bond_params, states)
 
         # TODO: not needed if status is already correct
-        request = device_config.request_bond(self.client_serial, self.device_mac, self.secret, self._next_iv())
+        request = device_config.request_bond(self.client_serial, self.device_mac, **self._credentials())
         states = (BandState.RequestedBond, BandState.ReceivedBond)
         await self._transact(request, self._process_bond, states)
 
@@ -144,24 +142,24 @@ class Band:
         logger.info(f"Stopped notifications, current state: {self.state}")
 
     async def set_time(self):
-        request = device_config.set_time(datetime.now(), key=self.secret, iv=self._next_iv())
+        request = device_config.set_time(datetime.now(), **self._credentials())
         await self._transact(request, lambda command: None)
 
     async def set_locale(self, language_tag: str, measurement_system: int):
-        request = locale_config.set_locale(language_tag, measurement_system, key=self.secret, iv=self._next_iv())
+        request = locale_config.set_locale(language_tag, measurement_system, **self._credentials())
         await self._transact(request, lambda command: None)
 
     def _process_link_params(self, command: Command):
         assert self.state == BandState.RequestedLinkParams, "bad state"
-        self.link_params, self.server_nonce = device_config.process_link_params(command)
+        self.link_params, self._server_nonce = device_config.process_link_params(command)
 
     def _process_authentication(self, command: Command):
         assert self.state == BandState.RequestedAuthentication, "bad state"
-        device_config.process_authentication(self.client_nonce, self.server_nonce, command)
+        device_config.process_authentication(self._client_nonce, self._server_nonce, command)
 
     def _process_bond_params(self, command: Command):
         assert self.state == BandState.RequestedBondParams, "bad state"
-        self.link_params.max_frame_size, self.encryption_counter = device_config.process_bond_params(command)
+        self.link_params.max_frame_size, self._encryption_counter = device_config.process_bond_params(command)
 
     def _process_bond(self, command):
         assert self.state == BandState.RequestedBond, "bad state"
@@ -176,7 +174,7 @@ async def run(config, loop):
     client_mac = config["client_mac"]
 
     async with BleakClient(device_mac if platform.system() != "Darwin" else device_uuid, loop=loop) as client:
-        band = Band(client=client, client_mac=client_mac, device_mac=device_mac, secret=secret, loop=loop)
+        band = Band(loop=loop, client=client, client_mac=client_mac, device_mac=device_mac, key=secret)
         await band.connect()
         await band.handshake()
         await band.set_time()

@@ -1,8 +1,8 @@
 import unittest
 
-from .protocol import AES_KEY_SIZE, Command, HUAWEI_LPV2_MAGIC, NONCE_LENGTH, Packet, TLV, VarInt, compute_digest, \
-    create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, encrypt, encrypt_packet, generate_nonce, \
-    hexlify
+from .protocol import AES_KEY_SIZE, Command, ENCRYPTION_COUNTER_MAX, HUAWEI_LPV2_MAGIC, NONCE_LENGTH, Packet, TLV, \
+    VarInt, compute_digest, create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, encrypt, \
+    encrypt_packet, generate_nonce, hexlify, initialization_vector
 from .services import CryptoTags
 
 
@@ -13,6 +13,13 @@ class TestUtils(unittest.TestCase):
 
     def test_int_encoding(self):
         self.assertEqual(list(range(1000)), [decode_int(encode_int(i)) for i in range(1000)])
+
+    def test_initialization_vector(self):
+        counter, iv = initialization_vector(7)
+        self.assertEqual((8,) * 2, (counter, decode_int(iv[-4:])))
+
+        counter, iv = initialization_vector(ENCRYPTION_COUNTER_MAX)
+        self.assertEqual((1,) * 2, (counter, decode_int(iv[-4:])))
 
     def test_encrypt_packet(self):
         self.assertRaises(TypeError, encrypt_packet(lambda: TestPacket.PACKET))

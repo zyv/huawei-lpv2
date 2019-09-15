@@ -49,6 +49,14 @@ def hexlify(data: bytes) -> str:
     return " ".join(chr(odd) + chr(even) for odd, even in zip(result[::2], result[1::2]))
 
 
+def initialization_vector(counter: int) -> (int, bytes):
+    if counter == ENCRYPTION_COUNTER_MAX:
+        counter = 1
+    else:
+        counter += 1
+    return counter, generate_nonce()[:-4] + encode_int(counter, length=4)
+
+
 class VarInt:
     def __init__(self, value: int):
         if value < 0:
