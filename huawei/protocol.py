@@ -218,13 +218,13 @@ class Packet:
         return Packet(service_id=self.service_id, command_id=self.command_id, command=self.command.decrypt(key, iv))
 
 
-def encrypt_packet(request):
-    @wraps(request)
+def encrypt_packet(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
         if not all(arg in kwargs for arg in ("key", "iv")):
             raise TypeError("encrypt_packet expects 'key' and 'iv' arguments")
         key, iv = kwargs.pop("key"), kwargs.pop("iv")
-        return request(*args, **kwargs).encrypt(key, iv)
+        return func(*args, **kwargs).encrypt(key, iv)
 
     return wrapper
 
