@@ -6,7 +6,7 @@ import platform
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from bleak import BleakClient
 
@@ -14,13 +14,11 @@ from huawei.protocol import Command, ENCRYPTION_COUNTER_MAX, Packet, encode_int,
 from huawei.services import TAG_RESULT
 from huawei.services import device_config
 from huawei.services import locale_config
-from huawei.services.device_config import DeviceConfig
-
-DEVICE_NAME = "default"
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+DEVICE_NAME = "default"
 CONFIG_FILE = Path("band.ini")
 
 GATT_WRITE = "0000fe01-0000-1000-8000-00805f9b34fb"
@@ -42,7 +40,6 @@ class BandState(enum.Enum):
     Ready = enum.auto()
 
     RequestedAck = enum.auto()
-    ReceivedAck = enum.auto()
 
     Disconnected = enum.auto()
 
@@ -69,6 +66,7 @@ class Band:
         self.bt_version: Optional[int] = None
         self.encryption_counter: int = 0
 
+        self._packet: Optional[Packet] = None
         self._event = asyncio.Event()
 
     def _next_iv(self):
@@ -77,117 +75,98 @@ class Band:
         self.encryption_counter += 1
         return generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
 
-    async def _wait_for_state(self, state: BandState, reset_state: bool = True):
-        logger.debug(f"Waiting for state: {state}...")
+    async def _process_response(self, request: Packet, func: Callable, target_state: BandState = BandState.Ready):
+        logger.debug(f"Waiting for response from service_id={request.service_id}, command_id={request.command_id}...")
 
         await self._event.wait()
-
-        if self.state != state:
-            raise RuntimeError(f"bad state: {self.state} != {state}")
-
-        logger.debug(f"Response received, state {state} attained!")
-
-        if reset_state:
-            self.state = BandState.Ready
-            logger.debug(f"State reset: {self.state}")
-
         self._event.clear()
+
+        assert (self._packet.service_id, self._packet.command_id) == (request.service_id, request.command_id)
+        func(self._packet.command)
+
+        self.state, self._packet = target_state, None
+
+        logger.debug(f"Response processed, attained request state: {self.state}")
 
     def _send_data(self, packet: Packet, new_state: BandState = BandState.RequestedAck):
         data = bytes(packet)
-        logger.debug(f"State: {self.state}, sending: {hexlify(data)}")
+        logger.debug(f"Current state: {self.state}, sending: {hexlify(data)}")
+
+        promise = self.client.write_gatt_char(GATT_WRITE, data)
 
         self.state = new_state
-        logger.debug(f"Switched to state: {new_state}")
+        logger.debug(f"Switched to requested state: {new_state}")
 
-        return self.client.write_gatt_char(GATT_WRITE, data)
+        return promise
 
     def _receive_data(self, sender, data):
-        logger.debug(f"State: {self.state}, received from '{sender}': {hexlify(bytes(data))}")
-        packet = Packet.from_bytes(data)
-        logger.debug(f"Parsed packet: {packet}")
+        logger.debug(f"Current state: {self.state}, received from '{sender}': {hexlify(bytes(data))}")
+        self._packet = Packet.from_bytes(data)
+        logger.debug(f"Parsed received packet: {self._packet}")
 
-        if self.state == BandState.RequestedLinkParams:
-            if (packet.service_id, packet.command_id) != (DeviceConfig.id, DeviceConfig.LinkParams.id):
-                raise RuntimeError("unexpected packet")
-            self._process_link_params(packet.command)
-        elif self.state == BandState.RequestedAuthentication:
-            if (packet.service_id, packet.command_id) != (DeviceConfig.id, DeviceConfig.Auth.id):
-                raise RuntimeError("unexpected packet")
-            self._process_authentication(packet.command)
-        elif self.state == BandState.RequestedBondParams:
-            if (packet.service_id, packet.command_id) != (DeviceConfig.id, DeviceConfig.BondParams.id):
-                raise RuntimeError("unexpected packet")
-            self._process_bond_params(packet.command)
-        elif self.state == BandState.RequestedBond:
-            if (packet.service_id, packet.command_id) != (DeviceConfig.id, DeviceConfig.Bond.id):
-                raise RuntimeError("unexpected packet")
-            self._process_bond(packet.command)
-        elif self.state == BandState.RequestedAck:
-            self.state = BandState.ReceivedAck
-
+        assert self.state.name.startswith("Requested"), "unexpected packet"
         self._event.set()
 
     async def connect(self):
         # TODO: decorator
         is_connected = await self.client.is_connected()
 
-        if not is_connected:
-            raise RuntimeError("device connection failed")
-
+        assert is_connected, "device connection failed"
         await self.client.start_notify(GATT_READ, self._receive_data)
 
         self.state = BandState.Connected
-        logger.info(f"Connected to band, state: {self.state}")
+        logger.info(f"Connected to band, current state: {self.state}")
 
     async def handshake(self):
-        await self._send_data(device_config.request_link_params(), BandState.RequestedLinkParams)
-        await self._wait_for_state(BandState.ReceivedLinkParams, False)
+        packet = device_config.request_link_params()
+        await self._send_data(packet, BandState.RequestedLinkParams)
+        await self._process_response(packet, self._process_link_params, BandState.ReceivedLinkParams)
 
         packet = device_config.request_authentication(self.client_nonce, self.server_nonce)
         await self._send_data(packet, BandState.RequestedAuthentication)
-        await self._wait_for_state(BandState.ReceivedAuthentication, False)
+        await self._process_response(packet, self._process_authentication, BandState.ReceivedAuthentication)
 
         packet = device_config.request_bond_params(self.client_serial, self.client_mac)
         await self._send_data(packet, BandState.RequestedBondParams)
-        await self._wait_for_state(BandState.ReceivedBondParams, False)
+        await self._process_response(packet, self._process_bond_params, BandState.ReceivedBondParams)
 
+        # TODO: not needed if status is already correct
         packet = device_config.request_bond(self.client_serial, self.device_mac, self.secret, self._next_iv())
-        await self._send_data(packet, BandState.RequestedBond)  # TODO: not needed if status is already correct
-        await self._wait_for_state(BandState.ReceivedBond)
+        await self._send_data(packet, BandState.RequestedBond)
+        await self._process_response(packet, self._process_bond, BandState.ReceivedBond)
 
     async def disconnect(self):
         self.state = BandState.Disconnected
         await asyncio.sleep(0.5)
         await self.client.stop_notify(GATT_READ)
-        logger.info(f"Stopped notifications, state: {self.state}")
+        logger.info(f"Stopped notifications, current state: {self.state}")
 
     async def set_time(self):
-        await self._send_data(device_config.set_time(datetime.now(), key=self.secret, iv=self._next_iv()))
-        await self._wait_for_state(BandState.ReceivedAck)
+        packet = device_config.set_time(datetime.now(), key=self.secret, iv=self._next_iv())
+        await self._send_data(packet)
+        await self._process_response(packet, lambda command: None)
 
     async def set_locale(self, language_tag: str, measurement_system: int):
         packet = locale_config.set_locale(language_tag, measurement_system, key=self.secret, iv=self._next_iv())
         await self._send_data(packet)
-        await self._wait_for_state(BandState.ReceivedAck)
+        await self._process_response(packet, lambda command: None)
 
     def _process_link_params(self, command: Command):
+        assert self.state == BandState.RequestedLinkParams, "bad state"
         self.link_params, self.server_nonce = device_config.process_link_params(command)
-        self.state = BandState.ReceivedLinkParams
 
     def _process_authentication(self, command: Command):
+        assert self.state == BandState.RequestedAuthentication, "bad state"
         device_config.process_authentication(self.client_nonce, self.server_nonce, command)
-        self.state = BandState.ReceivedAuthentication
 
     def _process_bond_params(self, command: Command):
+        assert self.state == BandState.RequestedBondParams, "bad state"
         self.link_params.max_frame_size, self.encryption_counter = device_config.process_bond_params(command)
-        self.state = BandState.ReceivedBondParams
 
     def _process_bond(self, command):
+        assert self.state == BandState.RequestedBond, "bad state"
         if TAG_RESULT in command:
             raise RuntimeError("bond negotiation failed")
-
-        self.state = BandState.ReceivedBond
 
 
 async def run(config, loop):
