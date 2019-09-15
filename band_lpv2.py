@@ -70,19 +70,6 @@ class Band:
         self._encryption_counter, iv = initialization_vector(self._encryption_counter)
         return {"key": self._key, "iv": iv}
 
-    async def _process_response(self, request: Packet, func: Callable, new_state: BandState):
-        logger.debug(f"Waiting for response from service_id={request.service_id}, command_id={request.command_id}...")
-
-        await self._event.wait()
-        self._event.clear()
-
-        assert (self._packet.service_id, self._packet.command_id) == (request.service_id, request.command_id)
-        func(self._packet.command)
-
-        self.state, self._packet = new_state, None
-
-        logger.debug(f"Response processed, attained requested state: {self.state}")
-
     async def _send_data(self, packet: Packet, new_state: BandState):
         data = bytes(packet)
         logger.debug(f"Request packet: {packet}")
@@ -99,20 +86,37 @@ class Band:
         assert self.state.name.startswith("Requested"), "unexpected packet"
         self._event.set()
 
-    async def connect(self):
-        # TODO: decorator
-        is_connected = await self.client.is_connected()
+    async def _process_response(self, request: Packet, func: Callable, new_state: BandState):
+        logger.debug(f"Waiting for response from service_id={request.service_id}, command_id={request.command_id}...")
 
-        assert is_connected, "device connection failed"
-        await self.client.start_notify(GATT_READ, self._receive_data)
+        await self._event.wait()
+        self._event.clear()
 
-        self.state = BandState.Connected
-        logger.info(f"Connected to band, current state: {self.state}")
+        assert (self._packet.service_id, self._packet.command_id) == (request.service_id, request.command_id)
+        func(self._packet.command)
+
+        self.state, self._packet = new_state, None
+
+        logger.debug(f"Response processed, attained requested state: {self.state}")
 
     async def _transact(self, request: Packet, func: Callable, states: Optional[Tuple[BandState, BandState]] = None):
         source_state, target_state = states if states is not None else (BandState.RequestedAck, BandState.Ready)
         await self._send_data(request, source_state)
         await self._process_response(request, func, target_state)
+
+    async def connect(self):
+        if not await self.client.is_connected():
+            await self.client.connect()
+        await self.client.start_notify(GATT_READ, self._receive_data)
+        self.state = BandState.Connected
+        logger.info(f"Connected to band, current state: {self.state}")
+
+    async def disconnect(self):
+        self.state = BandState.Disconnected
+        await asyncio.sleep(0.5)
+        await self.client.stop_notify(GATT_READ)
+        await self.client.disconnect()
+        logger.info(f"Stopped notifications, current state: {self.state}")
 
     async def handshake(self):
         request = device_config.request_link_params()
@@ -134,12 +138,6 @@ class Band:
 
         self.state = BandState.Ready
         logger.info(f"Handshake completed, current state: {self.state}")
-
-    async def disconnect(self):
-        self.state = BandState.Disconnected
-        await asyncio.sleep(0.5)
-        await self.client.stop_notify(GATT_READ)
-        logger.info(f"Stopped notifications, current state: {self.state}")
 
     async def set_time(self):
         request = device_config.set_time(datetime.now(), **self._credentials())
