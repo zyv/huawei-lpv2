@@ -201,7 +201,11 @@ def main():
     config.read(CONFIG_FILE.name)
 
     event_loop = asyncio.get_event_loop()
-    event_loop.run_until_complete(run(config[DEVICE_NAME], event_loop))
+
+    try:
+        event_loop.run_until_complete(run(config[DEVICE_NAME], event_loop))
+    finally:
+        event_loop.close()
 
 
 if __name__ == "__main__":
