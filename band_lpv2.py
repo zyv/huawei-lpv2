@@ -6,6 +6,7 @@ import platform
 from configparser import ConfigParser
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from bleak import BleakClient
 
@@ -48,25 +49,25 @@ class BandState(enum.Enum):
 
 class Band:
     def __init__(self, client: BleakClient, client_mac: str, device_mac: str, secret: bytes, loop):
-        self.state = BandState.Disconnected
+        self.state: BandState = BandState.Disconnected
 
-        self.client = client
-        self.client_mac = client_mac
-        self.device_mac = device_mac
-        self.secret = secret
+        self.client: BleakClient = client
+        self.client_mac: str = client_mac
+        self.device_mac: str = device_mac
+        self.secret: bytes = secret
         self.loop = loop
 
-        self.client_serial = client_mac.replace(":", "")[-6:]  # android.os.Build.SERIAL
+        self.client_serial: str = client_mac.replace(":", "")[-6:]  # android.os.Build.SERIAL
 
-        self.link_params = None
+        self.link_params: Optional[device_config.LinkParams] = None
 
-        self.server_nonce = None
-        self.client_nonce = generate_nonce()
+        self.server_nonce: Optional[bytes] = None
+        self.client_nonce: bytes = generate_nonce()
 
-        self.bond_status = None
-        self.bond_status_info = None
-        self.bt_version = None
-        self.encryption_counter = 0
+        self.bond_status: Optional[int] = None
+        self.bond_status_info: Optional[int] = None
+        self.bt_version: Optional[int] = None
+        self.encryption_counter: int = 0
 
         self._event = asyncio.Event()
 
