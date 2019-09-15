@@ -10,7 +10,8 @@ from typing import Callable, Optional, Tuple
 
 from bleak import BleakClient
 
-from huawei.protocol import Command, ENCRYPTION_COUNTER_MAX, Packet, encode_int, generate_nonce, hexlify
+from huawei.protocol import Command, ENCRYPTION_COUNTER_MAX, GATT_READ, GATT_WRITE, Packet, encode_int, \
+    generate_nonce, hexlify
 from huawei.services import TAG_RESULT
 from huawei.services import device_config
 from huawei.services import locale_config
@@ -20,9 +21,6 @@ logger = logging.getLogger(__name__)
 
 DEVICE_NAME = "default"
 CONFIG_FILE = Path("band.ini")
-
-GATT_WRITE = "0000fe01-0000-1000-8000-00805f9b34fb"
-GATT_READ = "0000fe02-0000-1000-8000-00805f9b34fb"
 
 
 class BandState(enum.Enum):

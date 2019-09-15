@@ -18,8 +18,6 @@ CHARACTERISTICS = {
     "Manufacturer Name": "00002a29-0000-1000-8000-00805f9b34fb",
     # "Heart Rate Measurement": "00002a37-0000-1000-8000-00805f9b34fb",  # Not permitted
     "Body Sensor Location": "00002a38-0000-1000-8000-00805f9b34fb",
-    # "GATT_WRITE": "0000fe01-0000-1000-8000-00805f9b34fb",
-    # "GATT_READ": "0000fe02-0000-1000-8000-00805f9b34fb",
 }
 
 BODY_SENSOR_LOCATIONS = {

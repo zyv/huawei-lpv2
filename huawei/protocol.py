@@ -32,6 +32,9 @@ NONCE_LENGTH = 16
 
 ENCRYPTION_COUNTER_MAX = 4294967295
 
+GATT_WRITE = "0000fe01-0000-1000-8000-00805f9b34fb"
+GATT_READ = "0000fe02-0000-1000-8000-00805f9b34fb"
+
 
 def encode_int(value: int, length: int = 2) -> bytes:
     return value.to_bytes(length=length, byteorder=NETWORK_BYTEORDER)
