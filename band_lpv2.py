@@ -93,16 +93,17 @@ class Band:
         self._event.clear()
 
         assert (self._packet.service_id, self._packet.command_id) == (request.service_id, request.command_id)
-        func(self._packet.command)
+        result = func(self._packet.command)
 
         self.state, self._packet = new_state, None
-
         logger.debug(f"Response processed, attained requested state: {self.state}")
+
+        return result
 
     async def _transact(self, request: Packet, func: Callable, states: Optional[Tuple[BandState, BandState]] = None):
         source_state, target_state = states if states is not None else (BandState.RequestedAck, BandState.Ready)
         await self._send_data(request, source_state)
-        await self._process_response(request, func, target_state)
+        return await self._process_response(request, func, target_state)
 
     async def connect(self):
         if not await self.client.is_connected():
