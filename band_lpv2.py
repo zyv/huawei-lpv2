@@ -34,9 +34,8 @@ class BandState(enum.Enum):
     RequestedBond = enum.auto()
     ReceivedBond = enum.auto()
 
-    Ready = enum.auto()
-
     RequestedAck = enum.auto()
+    Ready = enum.auto()
 
     Disconnected = enum.auto()
 
