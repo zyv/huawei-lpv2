@@ -1,16 +1,20 @@
+import asyncio
 import binascii
 import hashlib
 import hmac
 import math
 import secrets
 from functools import wraps
+from logging import getLogger
 from typing import List, Optional
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from huawei.services import CryptoTags
+from .services import CryptoTags, RESULT_SUCCESS, TAG_RESULT
+
+logger = getLogger(__name__)
 
 HUAWEI_LPV2_MAGIC = b"\x5A"
 
@@ -223,6 +227,38 @@ def encrypt_packet(request):
         return request(*args, **kwargs).encrypt(key, iv)
 
     return wrapper
+
+
+def process_result(command: Command) -> Optional[int]:
+    if TAG_RESULT in command:
+        return decode_int(command[TAG_RESULT].value)
+
+
+def check_result(func):
+    def raise_if_unsuccessful(command: Command):
+        result = process_result(command)
+        if result is not None and result != RESULT_SUCCESS:
+            raise ValueError(f"result code does not indicate success: {result}")
+
+    if asyncio.iscoroutinefunction(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            command = await func(*args, **kwargs)
+            logger.debug(f"Checking coroutine result: {command}...")
+            raise_if_unsuccessful(command)
+            return command
+
+        return wrapper
+    else:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            command = args[0] if isinstance(args[0], Command) else args[1]  # support bound methods
+            logger.debug(f"Checking function or bound method input: {command}...")
+            assert isinstance(command, Command)
+            raise_if_unsuccessful(command)
+            return func(*args, **kwargs)
+
+        return wrapper
 
 
 def compute_digest(message: str, client_nonce: bytes, server_nonce: bytes):

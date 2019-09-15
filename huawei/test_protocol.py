@@ -1,12 +1,17 @@
+import asyncio
 import unittest
 
 from .protocol import AES_KEY_SIZE, Command, ENCRYPTION_COUNTER_MAX, HUAWEI_LPV2_MAGIC, NONCE_LENGTH, Packet, TLV, \
-    VarInt, compute_digest, create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, encrypt, \
-    encrypt_packet, generate_nonce, hexlify, initialization_vector
-from .services import CryptoTags
+    VarInt, check_result, compute_digest, create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, \
+    encrypt, encrypt_packet, generate_nonce, hexlify, initialization_vector, process_result
+from .services import CryptoTags, RESULT_ERROR, RESULT_SUCCESS, TAG_RESULT
 
 
 class TestUtils(unittest.TestCase):
+    COMMAND_SUCCESS = Command(tlvs=[TLV(tag=TAG_RESULT, value=encode_int(RESULT_SUCCESS, length=4))])
+    COMMAND_ERROR = Command(tlvs=[TLV(tag=TAG_RESULT, value=encode_int(RESULT_ERROR, length=4))])
+    COMMAND_NEUTRAL = Command(tlvs=[TLV(tag=1, value=b"abc")])
+
     def test_hexlify(self):
         self.assertEqual("", hexlify(b""))
         self.assertEqual("31 32 33 34 35", hexlify(b"12345"))
@@ -26,7 +31,31 @@ class TestUtils(unittest.TestCase):
 
         key, iv = generate_nonce(), generate_nonce()
         packet = encrypt_packet(lambda: TestPacket.PACKET)(key=key, iv=iv)
-        self.assertEqual(packet.decrypt(key, iv), TestPacket.PACKET)
+        self.assertEqual(TestPacket.PACKET, packet.decrypt(key, iv))
+
+    def test_process_result(self):
+        self.assertEqual(RESULT_SUCCESS, process_result(self.COMMAND_SUCCESS))
+        self.assertEqual(RESULT_ERROR, process_result(self.COMMAND_ERROR))
+        self.assertIsNone(process_result(self.COMMAND_NEUTRAL))
+
+    def test_check_result(self):
+        # function
+        self.assertTrue(check_result(lambda _: True)(self.COMMAND_SUCCESS))
+        self.assertTrue(check_result(lambda _: True)(self.COMMAND_NEUTRAL))
+        self.assertRaises(ValueError, check_result(lambda _: True), self.COMMAND_ERROR)
+
+        # bound method
+        self.assertRaises(ValueError, check_result(lambda _, __: True), object(), self.COMMAND_ERROR)
+
+        # coroutine
+        @check_result
+        async def coroutine():
+            return self.COMMAND_ERROR
+
+        def testbed():
+            return asyncio.get_event_loop().run_until_complete(coroutine())
+
+        self.assertRaises(ValueError, testbed)
 
 
 class TestVarInt(unittest.TestCase):
