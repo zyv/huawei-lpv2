@@ -27,8 +27,8 @@ GATT_READ = "0000fe02-0000-1000-8000-00805f9b34fb"
 
 
 class BandState(enum.Enum):
-    Disconnected = enum.auto()
     Connected = enum.auto()
+
     RequestedLinkParams = enum.auto()
     ReceivedLinkParams = enum.auto()
     RequestedAuthentication = enum.auto()
@@ -37,6 +37,13 @@ class BandState(enum.Enum):
     ReceivedBondParams = enum.auto()
     RequestedBond = enum.auto()
     ReceivedBond = enum.auto()
+
+    Ready = enum.auto()
+
+    RequestedAck = enum.auto()
+    ReceivedAck = enum.auto()
+
+    Disconnected = enum.auto()
 
 
 class Band:
@@ -69,26 +76,35 @@ class Band:
         self.encryption_counter += 1
         return generate_nonce()[:-4] + encode_int(self.encryption_counter, length=4)
 
-    async def _wait_for_state(self, state: BandState):
+    async def _wait_for_state(self, state: BandState, reset_state: bool = True):
         logger.debug(f"Waiting for state: {state}...")
+
         await self._event.wait()
+
         if self.state != state:
             raise RuntimeError(f"bad state: {self.state} != {state}")
+
         logger.debug(f"Response received, state {state} attained!")
 
-    def _send_data(self, packet: Packet, requires_response: bool = True):
+        if reset_state:
+            self.state = BandState.Ready
+            logger.debug(f"State reset: {self.state}")
+
+        self._event.clear()
+
+    def _send_data(self, packet: Packet, new_state: BandState = BandState.RequestedAck):
         data = bytes(packet)
         logger.debug(f"State: {self.state}, sending: {hexlify(data)}")
 
-        if requires_response:
-            self._event.clear()
+        self.state = new_state
+        logger.debug(f"Switched to state: {new_state}")
 
         return self.client.write_gatt_char(GATT_WRITE, data)
 
     def _receive_data(self, sender, data):
         logger.debug(f"State: {self.state}, received from '{sender}': {hexlify(bytes(data))}")
         packet = Packet.from_bytes(data)
-        logger.debug(f"Parsed: {packet}")
+        logger.debug(f"Parsed packet: {packet}")
 
         if self.state == BandState.RequestedLinkParams:
             if (packet.service_id, packet.command_id) != (DeviceConfig.id, DeviceConfig.LinkParams.id):
@@ -106,81 +122,65 @@ class Band:
             if (packet.service_id, packet.command_id) != (DeviceConfig.id, DeviceConfig.Bond.id):
                 raise RuntimeError("unexpected packet")
             self._process_bond(packet.command)
+        elif self.state == BandState.RequestedAck:
+            self.state = BandState.ReceivedAck
 
         self._event.set()
 
-    async def init(self):
+    async def connect(self):
+        # TODO: decorator
         is_connected = await self.client.is_connected()
 
         if not is_connected:
             raise RuntimeError("device connection failed")
 
-        self.state = BandState.Connected
-
-        logger.info(f"State: {self.state}")
-
         await self.client.start_notify(GATT_READ, self._receive_data)
 
-    async def connect(self):
-        await self._send_data(self._request_link_params())
+        self.state = BandState.Connected
+        logger.info(f"Connected to band, state: {self.state}")
 
-        await self._wait_for_state(BandState.ReceivedLinkParams)
+    async def handshake(self):
+        await self._send_data(device_config.request_link_params(), BandState.RequestedLinkParams)
+        await self._wait_for_state(BandState.ReceivedLinkParams, False)
 
-        await self._send_data(self._request_authentication())
+        packet = device_config.request_authentication(self.client_nonce, self.server_nonce)
+        await self._send_data(packet, BandState.RequestedAuthentication)
+        await self._wait_for_state(BandState.ReceivedAuthentication, False)
 
-        await self._wait_for_state(BandState.ReceivedAuthentication)
+        packet = device_config.request_bond_params(self.client_serial, self.client_mac)
+        await self._send_data(packet, BandState.RequestedBondParams)
+        await self._wait_for_state(BandState.ReceivedBondParams, False)
 
-        await self._send_data(self._request_bond_params())
-
-        await self._wait_for_state(BandState.ReceivedBondParams)
-
-        await self._send_data(self._request_bond())  # TODO: not needed if status is already correct
-
+        packet = device_config.request_bond(self.client_serial, self.device_mac, self.secret, self._next_iv())
+        await self._send_data(packet, BandState.RequestedBond)  # TODO: not needed if status is already correct
         await self._wait_for_state(BandState.ReceivedBond)
 
     async def disconnect(self):
-        await asyncio.sleep(0.5)
-
-        await self.client.stop_notify(GATT_READ)
-
         self.state = BandState.Disconnected
+        await asyncio.sleep(0.5)
+        await self.client.stop_notify(GATT_READ)
+        logger.info(f"Stopped notifications, state: {self.state}")
 
     async def set_time(self):
-        packet = device_config.set_time(datetime.now(), key=self.secret, iv=self._next_iv())
-        await self._send_data(packet)
+        await self._send_data(device_config.set_time(datetime.now(), key=self.secret, iv=self._next_iv()))
+        await self._wait_for_state(BandState.ReceivedAck)
 
-    async def set_locale(self, language_tag: str = "en-US",
-                         measurement_system: int = locale_config.MeasurementSystem.Metric):
+    async def set_locale(self, language_tag: str, measurement_system: int):
         packet = locale_config.set_locale(language_tag, measurement_system, key=self.secret, iv=self._next_iv())
         await self._send_data(packet)
-
-    def _request_link_params(self) -> Packet:
-        self.state = BandState.RequestedLinkParams
-        return device_config.request_link_params()
+        await self._wait_for_state(BandState.ReceivedAck)
 
     def _process_link_params(self, command: Command):
         self.link_params, self.server_nonce = device_config.process_link_params(command)
         self.state = BandState.ReceivedLinkParams
 
-    def _request_authentication(self):
-        self.state = BandState.RequestedAuthentication
-        return device_config.request_authentication(self.client_nonce, self.server_nonce)
-
     def _process_authentication(self, command: Command):
         device_config.process_authentication(self.client_nonce, self.server_nonce, command)
         self.state = BandState.ReceivedAuthentication
 
-    def _request_bond_params(self):
-        self.state = BandState.RequestedBondParams
-        return device_config.request_bond_params(self.client_serial, self.client_mac)
-
     def _process_bond_params(self, command: Command):
         self.link_params.max_frame_size, self.encryption_counter = device_config.process_bond_params(command)
         self.state = BandState.ReceivedBondParams
-
-    def _request_bond(self):
-        self.state = BandState.RequestedBond
-        return device_config.request_bond(self.client_serial, self.device_mac, self.secret, self._next_iv())
 
     def _process_bond(self, command):
         if TAG_RESULT in command:
@@ -197,10 +197,10 @@ async def run(config, loop):
 
     async with BleakClient(device_mac if platform.system() != "Darwin" else device_uuid, loop=loop) as client:
         band = Band(client=client, client_mac=client_mac, device_mac=device_mac, secret=secret, loop=loop)
-        await band.init()
         await band.connect()
+        await band.handshake()
         await band.set_time()
-        await band.set_locale()
+        await band.set_locale("en-US", locale_config.MeasurementSystem.Metric)
         await band.disconnect()
 
 
