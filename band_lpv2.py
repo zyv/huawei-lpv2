@@ -70,6 +70,8 @@ class Band:
         return {"key": self._key, "iv": iv}
 
     async def _send_data(self, packet: Packet, new_state: BandState):
+        assert not self.state.name.startswith("Requested"), f"tried to send while waiting for response: {self.state}"
+
         data = bytes(packet)
         logger.debug(f"Request packet: {packet}")
         logger.debug(f"Current state: {self.state}, target state: {new_state}, sending: {hexlify(data)}")
