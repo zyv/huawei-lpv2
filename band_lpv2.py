@@ -66,6 +66,7 @@ class Band:
         self._packet: Optional[Packet] = None
         self._event = asyncio.Event()
 
+    @property
     def _credentials(self):
         self._encryption_counter, iv = initialization_vector(self._encryption_counter)
         return {"key": self._key, "iv": iv}
@@ -135,7 +136,7 @@ class Band:
         await self._transact(request, self._process_bond_params, states)
 
         # TODO: not needed if status is already correct
-        request = device_config.request_bond(self.client_serial, self.device_mac, **self._credentials())
+        request = device_config.request_bond(self.client_serial, self.device_mac, **self._credentials)
         states = (BandState.RequestedBond, BandState.ReceivedBond)
         await self._transact(request, self._process_bond, states)
 
@@ -144,16 +145,16 @@ class Band:
 
     @check_result
     async def set_time(self):
-        request = device_config.set_time(datetime.now(), **self._credentials())
+        request = device_config.set_time(datetime.now(), **self._credentials)
         return await self._transact(request, lambda _: _)
 
     @check_result
     async def set_locale(self, language_tag: str, measurement_system: int):
-        request = locale_config.set_locale(language_tag, measurement_system, **self._credentials())
+        request = locale_config.set_locale(language_tag, measurement_system, **self._credentials)
         return await self._transact(request, lambda _: _)
 
     async def get_today_totals(self):
-        request = fitness.request_today_totals(**self._credentials())
+        request = fitness.request_today_totals(**self._credentials)
         return await self._transact(request, fitness.process_today_totals)
 
     def _process_link_params(self, command: Command):
