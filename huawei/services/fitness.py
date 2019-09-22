@@ -61,6 +61,10 @@ class ActivityTotals:
 
 @dataclass
 class HeartRate:
+    """
+    N.B. Sadly the device returns a timestamp in local timezone instead of UTC, so confusion is possible when crossing
+         timezone boundaries.
+    """
     time: datetime
     rate: int
 

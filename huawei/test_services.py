@@ -42,6 +42,7 @@ class TestFitness(unittest.TestCase):
         self.assertEqual(
             TodayTotals(
                 calories=12,
+                # Reference datetime should be in the local timezone!
                 heart_rate=HeartRate(time=datetime.fromtimestamp(1568447738.0), rate=50),
                 activities=[
                     ActivityTotals(type=MotionType.Walking, calories=12, steps=624, distance=396),
