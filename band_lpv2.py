@@ -13,6 +13,7 @@ from bleak import BleakClient
 from huawei.protocol import Command, GATT_READ, GATT_WRITE, Packet, check_result, generate_nonce, hexlify, \
     initialization_vector
 from huawei.services import device_config
+from huawei.services import fitness
 from huawei.services import locale_config
 
 logging.basicConfig(level=logging.DEBUG)
@@ -151,6 +152,10 @@ class Band:
         request = locale_config.set_locale(language_tag, measurement_system, **self._credentials())
         return await self._transact(request, lambda _: _)
 
+    async def get_today_totals(self):
+        request = fitness.request_today_totals(**self._credentials())
+        return await self._transact(request, fitness.process_today_totals)
+
     def _process_link_params(self, command: Command):
         assert self.state == BandState.RequestedLinkParams, "bad state"
         self.link_params, self._server_nonce = device_config.process_link_params(command)
@@ -181,6 +186,7 @@ async def run(config, loop):
         await band.handshake()
         await band.set_time()
         await band.set_locale("en-US", locale_config.MeasurementSystem.Metric)
+        await band.get_today_totals()
         await band.disconnect()
 
 
