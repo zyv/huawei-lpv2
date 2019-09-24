@@ -148,6 +148,15 @@ class Band:
         request = device_config.set_time(datetime.now(), **self._credentials)
         return await self._transact(request, lambda _: _)
 
+    async def set_rotation_actions(self, activate: bool = True, navigate: bool = False):
+        @check_result
+        async def set_status(func, state):
+            request = func(state, **self._credentials)
+            return await self._transact(request, lambda _: _)
+
+        await set_status(device_config.set_activate_on_rotate, activate)
+        await set_status(device_config.set_navigate_on_rotate, navigate)
+
     @check_result
     async def set_locale(self, language_tag: str, measurement_system: int):
         request = locale_config.set_locale(language_tag, measurement_system, **self._credentials)
@@ -185,6 +194,7 @@ async def run(config, loop):
         band = Band(loop=loop, client=client, client_mac=client_mac, device_mac=device_mac, key=secret)
         await band.connect()
         await band.handshake()
+        await band.set_rotation_actions()
         await band.set_time()
         await band.set_locale("en-US", locale_config.MeasurementSystem.Metric)
         await band.get_today_totals()

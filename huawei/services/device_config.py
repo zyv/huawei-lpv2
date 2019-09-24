@@ -70,6 +70,18 @@ class DeviceConfig:
             Challenge = 1
             Nonce = 2
 
+    class ActivateOnRotate:
+        id = 9
+
+        class Tags:
+            SetStatus = 1
+
+    class NavigateOnRotate:
+        id = 27
+
+        class Tags:
+            SetStatus = 1
+
 
 def request_link_params() -> Packet:
     return Packet(
@@ -217,3 +229,23 @@ def set_time(moment: datetime) -> Packet:
     offset_minutes = int(abs(float_minutes * 60))
 
     return request_set_time(moment.timestamp(), offset_hours, offset_minutes)
+
+
+def set_status(command_id: int, tag: int, value: bool) -> Packet:
+    return Packet(
+        service_id=DeviceConfig.id,
+        command_id=command_id,
+        command=Command(tlvs=[
+            TLV(tag=tag, value=encode_int(int(value), length=1)),
+        ]),
+    )
+
+
+@encrypt_packet
+def set_activate_on_rotate(state: bool) -> Packet:
+    return set_status(DeviceConfig.ActivateOnRotate.id, DeviceConfig.ActivateOnRotate.Tags.SetStatus, state)
+
+
+@encrypt_packet
+def set_navigate_on_rotate(state: bool) -> Packet:
+    return set_status(DeviceConfig.NavigateOnRotate.id, DeviceConfig.NavigateOnRotate.Tags.SetStatus, state)
