@@ -70,6 +70,12 @@ class DeviceConfig:
             Challenge = 1
             Nonce = 2
 
+    class BatteryLevel:
+        id = 8
+
+        class Tags:
+            GetStatus = 1
+
     class ActivateOnRotate:
         id = 9
 
@@ -249,3 +255,19 @@ def set_activate_on_rotate(state: bool) -> Packet:
 @encrypt_packet
 def set_navigate_on_rotate(state: bool) -> Packet:
     return set_status(DeviceConfig.NavigateOnRotate.id, DeviceConfig.NavigateOnRotate.Tags.SetStatus, state)
+
+
+@encrypt_packet
+def get_battery_level() -> Packet:
+    return Packet(
+        service_id=DeviceConfig.id,
+        command_id=DeviceConfig.BatteryLevel.id,
+        command=Command(tlvs=[
+            TLV(tag=DeviceConfig.BatteryLevel.Tags.GetStatus),
+        ]),
+    )
+
+
+@check_result
+def process_battery_level(command: Command):
+    return decode_int(command[DeviceConfig.BatteryLevel.Tags.GetStatus].value)

@@ -143,6 +143,10 @@ class Band:
         self.state = BandState.Ready
         logger.info(f"Handshake completed, current state: {self.state}")
 
+    async def get_battery_level(self) -> int:
+        request = device_config.get_battery_level(**self._credentials)
+        return await self._transact(request, device_config.process_battery_level)
+
     @check_result
     async def set_time(self):
         request = device_config.set_time(datetime.now(), **self._credentials)
@@ -194,6 +198,10 @@ async def run(config, loop):
         band = Band(loop=loop, client=client, client_mac=client_mac, device_mac=device_mac, key=secret)
         await band.connect()
         await band.handshake()
+
+        battery_level = await band.get_battery_level()
+        logger.info(f"Battery level: {battery_level}")
+
         await band.set_rotation_actions()
         await band.set_time()
         await band.set_locale("en-US", locale_config.MeasurementSystem.Metric)
