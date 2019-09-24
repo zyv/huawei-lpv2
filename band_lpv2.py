@@ -196,6 +196,7 @@ async def run(config, loop):
 
     async with BleakClient(device_mac if platform.system() != "Darwin" else device_uuid, loop=loop) as client:
         band = Band(loop=loop, client=client, client_mac=client_mac, device_mac=device_mac, key=secret)
+
         await band.connect()
         await band.handshake()
 
@@ -205,7 +206,10 @@ async def run(config, loop):
         await band.set_rotation_actions()
         await band.set_time()
         await band.set_locale("en-US", locale_config.MeasurementSystem.Metric)
-        await band.get_today_totals()
+
+        today_totals = await band.get_today_totals()
+        logger.info(f"Today totals: {today_totals}")
+
         await band.disconnect()
 
 
