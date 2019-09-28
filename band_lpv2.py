@@ -162,6 +162,11 @@ class Band:
         await set_status(device_config.set_navigate_on_rotate, navigate)
 
     @check_result
+    async def set_right_wrist(self, state: bool = False):
+        request = device_config.set_right_wrist(state, **self._credentials)
+        return await self._transact(request, lambda _: _)
+
+    @check_result
     async def set_locale(self, language_tag: str, measurement_system: int):
         request = locale_config.set_locale(language_tag, measurement_system, **self._credentials)
         return await self._transact(request, lambda _: _)
@@ -203,6 +208,7 @@ async def run(config, loop):
         battery_level = await band.get_battery_level()
         logger.info(f"Battery level: {battery_level}")
 
+        await band.set_right_wrist()
         await band.set_rotation_actions()
         await band.set_time()
         await band.set_locale("en-US", locale_config.MeasurementSystem.Metric)

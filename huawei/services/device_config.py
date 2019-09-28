@@ -88,6 +88,12 @@ class DeviceConfig:
         class Tags:
             SetStatus = 1
 
+    class LeftRightWrist:
+        id = 26
+
+        class Tags:
+            SetStatus = 1
+
 
 def request_link_params() -> Packet:
     return Packet(
@@ -271,3 +277,8 @@ def get_battery_level() -> Packet:
 @check_result
 def process_battery_level(command: Command):
     return decode_int(command[DeviceConfig.BatteryLevel.Tags.GetStatus].value)
+
+
+@encrypt_packet
+def set_right_wrist(state: bool) -> Packet:
+    return set_status(DeviceConfig.LeftRightWrist.id, DeviceConfig.LeftRightWrist.Tags.SetStatus, state)
