@@ -15,6 +15,8 @@ from huawei.protocol import Command, GATT_READ, GATT_WRITE, Packet, check_result
 from huawei.services import device_config
 from huawei.services import fitness
 from huawei.services import locale_config
+from huawei.services import notification
+from huawei.services.notification import NotificationType
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -65,11 +67,20 @@ class Band:
 
         self._packet: Optional[Packet] = None
         self._event = asyncio.Event()
+        self.__message_id: int = -1
 
     @property
     def _credentials(self):
         self._encryption_counter, iv = initialization_vector(self._encryption_counter)
         return {"key": self._key, "iv": iv}
+
+    @property
+    def _message_id(self) -> int:
+        if self.__message_id < 256:
+            self.__message_id += 1
+        else:
+            self.__message_id = 0
+        return self.__message_id
 
     async def _send_data(self, packet: Packet, new_state: BandState):
         assert not self.state.name.startswith("Requested"), f"tried to send while waiting for response: {self.state}"
@@ -175,6 +186,13 @@ class Band:
         request = fitness.request_today_totals(**self._credentials)
         return await self._transact(request, fitness.process_today_totals)
 
+    @check_result
+    async def send_notification(self, text: str, title: Optional[str] = None, vibrate: bool = False,
+                                notification_type: NotificationType = NotificationType.Generic):
+        return await self._transact(
+            notification.send_notification(self._message_id, text, title, vibrate, notification_type,
+                                           **self._credentials), lambda _: _)
+
     def _process_link_params(self, command: Command):
         assert self.state == BandState.RequestedLinkParams, "bad state"
         self.link_params, self._server_nonce = device_config.process_link_params(command)
@@ -215,6 +233,9 @@ async def run(config, loop):
 
         today_totals = await band.get_today_totals()
         logger.info(f"Today totals: {today_totals}")
+
+        # await band.send_notification("Really nice to see you ^__^", "Hello, World!",
+        #                              vibrate=True, notification_type=NotificationType.Email)
 
         await band.disconnect()
 
