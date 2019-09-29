@@ -8,7 +8,7 @@ from .services.fitness import ActivityTotals, HeartRate, MotionType, TodayTotals
 
 
 class TestFitness(unittest.TestCase):
-    def test_process_total_totals(self):
+    def test_process_today_totals(self):
         packet = Packet(service_id=7, command_id=3, command=Command(tlvs=[TLV(tag=129, value=bytes(Command(tlvs=[
             TLV(tag=2, value=bytes.fromhex("00 00 00 0C")),
             TLV(tag=131, value=bytes(Command(tlvs=[
