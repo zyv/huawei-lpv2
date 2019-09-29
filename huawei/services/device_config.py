@@ -264,7 +264,7 @@ def set_navigate_on_rotate(state: bool) -> Packet:
 
 
 @encrypt_packet
-def get_battery_level() -> Packet:
+def request_battery_level() -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.BatteryLevel.id,

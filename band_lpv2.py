@@ -155,7 +155,7 @@ class Band:
         logger.info(f"Handshake completed, current state: {self.state}")
 
     async def get_battery_level(self) -> int:
-        request = device_config.get_battery_level(**self._credentials)
+        request = device_config.request_battery_level(**self._credentials)
         return await self._transact(request, device_config.process_battery_level)
 
     @check_result
