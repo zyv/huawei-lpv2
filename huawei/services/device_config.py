@@ -4,7 +4,7 @@ from logging import getLogger
 from typing import Tuple
 
 from ..protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, TLV, check_result, \
-    create_bonding_key, decode_int, digest_challenge, digest_response, encode_int, encrypt_packet, hexlify
+    create_bonding_key, decode_int, digest_challenge, digest_response, encode_int, encrypt_packet, hexlify, set_status
 
 logger = getLogger(__name__)
 
@@ -243,24 +243,16 @@ def set_time(moment: datetime) -> Packet:
     return request_set_time(moment.timestamp(), offset_hours, offset_minutes)
 
 
-def set_status(command_id: int, tag: int, value: bool) -> Packet:
-    return Packet(
-        service_id=DeviceConfig.id,
-        command_id=command_id,
-        command=Command(tlvs=[
-            TLV(tag=tag, value=encode_int(int(value), length=1)),
-        ]),
-    )
-
-
 @encrypt_packet
 def set_activate_on_rotate(state: bool) -> Packet:
-    return set_status(DeviceConfig.ActivateOnRotate.id, DeviceConfig.ActivateOnRotate.Tags.SetStatus, state)
+    return set_status(
+        DeviceConfig.id, DeviceConfig.ActivateOnRotate.id, DeviceConfig.ActivateOnRotate.Tags.SetStatus, state)
 
 
 @encrypt_packet
 def set_navigate_on_rotate(state: bool) -> Packet:
-    return set_status(DeviceConfig.NavigateOnRotate.id, DeviceConfig.NavigateOnRotate.Tags.SetStatus, state)
+    return set_status(
+        DeviceConfig.id, DeviceConfig.NavigateOnRotate.id, DeviceConfig.NavigateOnRotate.Tags.SetStatus, state)
 
 
 @encrypt_packet
@@ -281,4 +273,5 @@ def process_battery_level(command: Command):
 
 @encrypt_packet
 def set_right_wrist(state: bool) -> Packet:
-    return set_status(DeviceConfig.LeftRightWrist.id, DeviceConfig.LeftRightWrist.Tags.SetStatus, state)
+    return set_status(
+        DeviceConfig.id, DeviceConfig.LeftRightWrist.id, DeviceConfig.LeftRightWrist.Tags.SetStatus, state)

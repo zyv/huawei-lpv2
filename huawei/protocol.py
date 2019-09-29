@@ -261,6 +261,16 @@ def check_result(func):
         return wrapper
 
 
+def set_status(service_id: int, command_id: int, tag: int, value: bool) -> Packet:
+    return Packet(
+        service_id=service_id,
+        command_id=command_id,
+        command=Command(tlvs=[
+            TLV(tag=tag, value=encode_int(int(value), length=1)),
+        ]),
+    )
+
+
 def compute_digest(message: str, client_nonce: bytes, server_nonce: bytes):
     complete_nonce = server_nonce + client_nonce
 

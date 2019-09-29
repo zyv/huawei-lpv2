@@ -3,7 +3,7 @@ import unittest
 
 from .protocol import AES_KEY_SIZE, Command, ENCRYPTION_COUNTER_MAX, HUAWEI_LPV2_MAGIC, NONCE_LENGTH, Packet, TLV, \
     VarInt, check_result, compute_digest, create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, \
-    encrypt, encrypt_packet, generate_nonce, hexlify, initialization_vector, process_result
+    encrypt, encrypt_packet, generate_nonce, hexlify, initialization_vector, process_result, set_status
 from .services import CryptoTags, RESULT_ERROR, RESULT_SUCCESS, TAG_RESULT
 
 
@@ -56,6 +56,14 @@ class TestUtils(unittest.TestCase):
             return asyncio.get_event_loop().run_until_complete(coroutine())
 
         self.assertRaises(ValueError, testbed)
+
+    def test_set_status(self):
+        self.assertEqual(
+            set_status(1, 2, 3, False),
+            Packet(service_id=1, command_id=2, command=Command(tlvs=[
+                TLV(tag=3, value=b"\x00"),
+            ])),
+        )
 
 
 class TestVarInt(unittest.TestCase):
