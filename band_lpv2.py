@@ -192,6 +192,16 @@ class Band:
         return await self._transact(request, fitness.process_today_totals)
 
     @check_result
+    async def enable_trusleep(self, state: bool):
+        request = fitness.enable_trusleep(state, **self._credentials)
+        return await self._transact(request, lambda _: _)
+
+    @check_result
+    async def enable_heart_rate_monitoring(self, state: bool):
+        request = fitness.enable_heart_rate_monitoring(state, **self._credentials)
+        return await self._transact(request, lambda _: _)
+
+    @check_result
     async def send_notification(self, text: str, title: Optional[str] = None, vibrate: bool = False,
                                 notification_type: NotificationType = NotificationType.Generic):
         return await self._transact(
@@ -240,6 +250,9 @@ async def run(config, loop):
             int(config.get("height", 170)), int(config.get("weight", 60)), fitness.Sex(int(config.get("sex", 1))),
             date.fromisoformat(config.get("birth_date", "1990-08-01")),
         )
+
+        await band.enable_trusleep(True)
+        await band.enable_heart_rate_monitoring(False)
 
         today_totals = await band.get_today_totals()
         logger.info(f"Today totals: {today_totals}")

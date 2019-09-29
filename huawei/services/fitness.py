@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Callable, List, Optional
 
-from ..protocol import Command, Packet, TLV, check_result, decode_int, encode_int, encrypt_packet
+from ..protocol import Command, Packet, TLV, check_result, decode_int, encode_int, encrypt_packet, set_status
 
 
 class Fitness:
@@ -36,6 +36,18 @@ class Fitness:
             Height = 10
             Response = 129
             Activity = 131
+
+    class TruSleepState:
+        id = 22
+
+        class Tags:
+            SetStatus = 1
+
+    class HRMonitorState:
+        id = 23
+
+        class Tags:
+            SetStatus = 1
 
 
 @encrypt_packet
@@ -140,3 +152,13 @@ def set_user_info(height: int, weight: int, sex: Sex, birth_date: date) -> Packe
             TLV(tag=tags.WaistMax, value=encode_int(int(height * 0.83), length=1)),
         ]),
     )
+
+
+@encrypt_packet
+def enable_trusleep(state: bool) -> Packet:
+    return set_status(Fitness.id, Fitness.TruSleepState.id, Fitness.TruSleepState.Tags.SetStatus, state)
+
+
+@encrypt_packet
+def enable_heart_rate_monitoring(state: bool) -> Packet:
+    return set_status(Fitness.id, Fitness.HRMonitorState.id, Fitness.HRMonitorState.Tags.SetStatus, state)
