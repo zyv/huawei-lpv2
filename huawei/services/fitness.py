@@ -1,13 +1,25 @@
 import enum
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Callable, List, Optional
 
-from ..protocol import Command, Packet, TLV, check_result, decode_int, encrypt_packet
+from ..protocol import Command, Packet, TLV, check_result, decode_int, encode_int, encrypt_packet
 
 
 class Fitness:
     id = 7
+
+    class SetUserInfo:
+        id = 2
+
+        class Tags:
+            Height = 1
+            Weight = 2
+            Age = 3
+            BirthDate = 4
+            Sex = 5
+            WaistMedian = 6
+            WaistMax = 7
 
     class GetTodayTotals:
         id = 3
@@ -101,4 +113,30 @@ def process_today_totals(command: Command) -> TodayTotals:
             )
             for tlv in response.tlvs if tlv.tag == tags.Activity
         ],
+    )
+
+
+class Sex(enum.Enum):
+    Male = 1
+    Female = 2
+
+
+@encrypt_packet
+def set_user_info(height: int, weight: int, sex: Sex, birth_date: date) -> Packet:
+    age = int((date.today() - birth_date).days / 365.25)
+    packed_birthday = (encode_int(birth_date.year, length=2) + encode_int(birth_date.month, length=1) +
+                       encode_int(birth_date.day, length=1))
+    tags = Fitness.SetUserInfo.Tags
+    return Packet(
+        service_id=Fitness.id,
+        command_id=Fitness.SetUserInfo.id,
+        command=Command(tlvs=[
+            TLV(tag=tags.Height, value=encode_int(height, length=1)),
+            TLV(tag=tags.Weight, value=encode_int(weight, length=1)),
+            TLV(tag=tags.Age, value=encode_int(age, length=1)),
+            TLV(tag=tags.BirthDate, value=packed_birthday),
+            TLV(tag=tags.Sex, value=encode_int(sex.value, length=1)),
+            TLV(tag=tags.WaistMedian, value=encode_int(int(height * 0.42), length=1)),
+            TLV(tag=tags.WaistMax, value=encode_int(int(height * 0.83), length=1)),
+        ]),
     )

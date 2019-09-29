@@ -4,7 +4,7 @@ import enum
 import logging
 import platform
 from configparser import ConfigParser
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
@@ -182,6 +182,11 @@ class Band:
         request = locale_config.set_locale(language_tag, measurement_system, **self._credentials)
         return await self._transact(request, lambda _: _)
 
+    @check_result
+    async def set_user_info(self, height: int, weight: int, sex: fitness.Sex, birth_date: date):
+        request = fitness.set_user_info(height, weight, sex, birth_date, **self._credentials)
+        return await self._transact(request, lambda _: _)
+
     async def get_today_totals(self):
         request = fitness.request_today_totals(**self._credentials)
         return await self._transact(request, fitness.process_today_totals)
@@ -230,6 +235,11 @@ async def run(config, loop):
         await band.set_rotation_actions()
         await band.set_time()
         await band.set_locale("en-US", locale_config.MeasurementSystem.Metric)
+
+        await band.set_user_info(
+            int(config.get("height", 170)), int(config.get("weight", 60)), fitness.Sex(int(config.get("sex", 1))),
+            date.fromisoformat(config.get("birth_date", "1990-08-01")),
+        )
 
         today_totals = await band.get_today_totals()
         logger.info(f"Today totals: {today_totals}")

@@ -1,7 +1,8 @@
 import unittest
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from unittest.mock import patch
 
-from .protocol import Command, Packet, TLV
+from .protocol import Command, Packet, TLV, generate_nonce
 from .services import fitness
 from .services.fitness import ActivityTotals, HeartRate, MotionType, TodayTotals
 
@@ -55,3 +56,24 @@ class TestFitness(unittest.TestCase):
             ),
             fitness.process_today_totals(packet.command),
         )
+
+    def test_set_user_info(self):
+        key, iv = generate_nonce(), generate_nonce()
+
+        with patch("huawei.services.fitness.date") as mock_date:
+            mock_date.today.return_value = date(2000, 1, 1)
+            mock_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
+
+            self.assertEqual(
+                Packet(service_id=7, command_id=2, command=Command(tlvs=[
+                    TLV(tag=1, value=b"\xAA"),
+                    TLV(tag=2, value=b"\x3C"),
+                    TLV(tag=3, value=b"\x09"),
+                    TLV(tag=4, value=b"\x07\xC6\x08\x01"),
+                    TLV(tag=5, value=b"\x02"),
+                    TLV(tag=6, value=b"\x47"),
+                    TLV(tag=7, value=b"\x8D"),
+                ])),
+                fitness.set_user_info(height=170, weight=60, sex=fitness.Sex.Female, birth_date=date(1990, 8, 1),
+                                      key=key, iv=iv).decrypt(key, iv),
+            )
