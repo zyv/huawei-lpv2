@@ -154,6 +154,11 @@ class Band:
         self.state = BandState.Ready
         logger.info(f"Handshake completed, current state: {self.state}")
 
+    @check_result
+    async def factory_reset(self):
+        request = device_config.factory_reset(**self._credentials)
+        return await self._transact(request, lambda _: _)
+
     async def get_battery_level(self) -> int:
         request = device_config.request_battery_level(**self._credentials)
         return await self._transact(request, device_config.process_battery_level)
@@ -237,6 +242,8 @@ async def run(config, loop):
 
         await band.connect()
         await band.handshake()
+
+        # await band.factory_reset()
 
         battery_level = await band.get_battery_level()
         logger.info(f"Battery level: {battery_level}")

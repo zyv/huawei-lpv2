@@ -82,6 +82,12 @@ class DeviceConfig:
         class Tags:
             SetStatus = 1
 
+    class FactoryReset:
+        id = 13
+
+        class Tags:
+            SetStatus = 1
+
     class NavigateOnRotate:
         id = 27
 
@@ -275,3 +281,8 @@ def process_battery_level(command: Command):
 def set_right_wrist(state: bool) -> Packet:
     return set_status(
         DeviceConfig.id, DeviceConfig.LeftRightWrist.id, DeviceConfig.LeftRightWrist.Tags.SetStatus, state)
+
+
+@encrypt_packet
+def factory_reset() -> Packet:
+    return set_status(DeviceConfig.id, DeviceConfig.FactoryReset.id, DeviceConfig.FactoryReset.Tags.SetStatus, True)
