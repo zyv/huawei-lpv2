@@ -43,11 +43,18 @@ class DeviceConfig:
         id = 7
 
         class Tags:
-            ProductType = 2  # for request
+            BTVersion = 1
+            ProductType = 2  # int
             HardwareVersion = 3
+            PhoneNumber = 4
+            MacAddress = 5
+            IMEI = 6
             SoftwareVersion = 7
+            OpenSourceVersion = 8
             SerialNumber = 9
-            ProductModel = 12
+            ProductModel = 10
+            eMMCId = 11
+            HealthAppSupport = 13  # int
 
     class Bond:
         id = 14
