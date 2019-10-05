@@ -164,6 +164,11 @@ class Band:
         return await self._transact(request, device_config.process_battery_level)
 
     @check_result
+    async def set_date_format(self, date_format: device_config.DateFormat, time_format: device_config.TimeFormat):
+        request = device_config.set_date_format(date_format, time_format, **self._credentials)
+        return await self._transact(request, lambda _: _)
+
+    @check_result
     async def set_time(self):
         request = device_config.set_time(datetime.now(), **self._credentials)
         return await self._transact(request, lambda _: _)
@@ -252,6 +257,7 @@ async def run(config, loop):
         await band.set_rotation_actions()
         await band.set_time()
         await band.set_locale("en-US", locale_config.MeasurementSystem.Metric)
+        await band.set_date_format(device_config.DateFormat.YearFirst, device_config.TimeFormat.Hours24)
 
         await band.set_user_info(
             int(config.get("height", 170)), int(config.get("weight", 60)), fitness.Sex(int(config.get("sex", 1))),

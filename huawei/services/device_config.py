@@ -1,3 +1,4 @@
+import enum
 from dataclasses import dataclass
 from datetime import datetime
 from logging import getLogger
@@ -22,6 +23,14 @@ class DeviceConfig:
             ConnectionInterval = 4
             ServerNonce = 5
             PathExtendNumber = 6  # apparently used for BTVersion == 0
+
+    class SetDateFormat:
+        id = 4
+
+        class Tags:
+            DateFormat = 2
+            TimeFormat = 3
+            SetDateFormat = 129
 
     class SetTime:
         id = 5
@@ -222,6 +231,33 @@ def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> 
             TLV(tag=DeviceConfig.Bond.Tags.ClientSerial, value=client_serial.encode()),
             TLV(tag=DeviceConfig.Bond.Tags.BondingKey, value=create_bonding_key(device_mac, key, iv)),
             TLV(tag=DeviceConfig.Bond.Tags.InitVector, value=iv),
+        ]),
+    )
+
+
+class DateFormat(enum.Enum):
+    YearFirst = 1
+    MonthFirst = 2
+    DayFirst = 3
+
+
+class TimeFormat(enum.Enum):
+    Hours12 = 1
+    Hours24 = 2
+
+
+@encrypt_packet
+def set_date_format(date_format: DateFormat, time_format: TimeFormat) -> Packet:
+    return Packet(
+        service_id=DeviceConfig.id,
+        command_id=DeviceConfig.SetDateFormat.id,
+        command=Command(tlvs=[
+            TLV(tag=DeviceConfig.SetDateFormat.Tags.SetDateFormat, value=bytes(
+                Command(tlvs=[
+                    TLV(tag=DeviceConfig.SetDateFormat.Tags.DateFormat, value=encode_int(date_format.value, length=1)),
+                    TLV(tag=DeviceConfig.SetDateFormat.Tags.TimeFormat, value=encode_int(time_format.value, length=1)),
+                ]),
+            )),
         ]),
     )
 
