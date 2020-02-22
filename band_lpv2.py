@@ -98,7 +98,7 @@ class Band:
         logger.debug(f"Parsed response packet: {self._packet}")
 
         assert self.state.name.startswith("Requested"), "unexpected packet"
-        self._event.set()
+        self.loop.call_soon_threadsafe(self._event.set())
 
     async def _process_response(self, request: Packet, func: Callable, new_state: BandState):
         logger.debug(f"Waiting for response from service_id={request.service_id}, command_id={request.command_id}...")
