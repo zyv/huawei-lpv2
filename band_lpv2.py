@@ -90,9 +90,9 @@ class Band:
         logger.debug(f"Current state: {self.state}, target state: {new_state}, sending: {hexlify(data)}")
 
         self.state = new_state
-        await self.client.write_gatt_char(GATT_WRITE, data)
+        await self.client.write_gatt_char(GATT_WRITE, bytearray(data))
 
-    def _receive_data(self, sender: str, data: bytes):
+    def _receive_data(self, sender: int, data: bytes):
         logger.debug(f"Current state: {self.state}, received from '{sender}': {hexlify(bytes(data))}")
         self._packet = Packet.from_bytes(data)
         logger.debug(f"Parsed response packet: {self._packet}")
