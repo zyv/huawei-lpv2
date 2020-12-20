@@ -39,7 +39,7 @@ class DeviceConfig:
             Timestamp = 1
             ZoneOffset = 2
 
-    class ProductType:
+    class ProductInfo:
         id = 7
 
         class Tags:
@@ -329,3 +329,12 @@ def set_right_wrist(state: bool) -> Packet:
 @encrypt_packet
 def factory_reset() -> Packet:
     return set_status(DeviceConfig.id, DeviceConfig.FactoryReset.id, DeviceConfig.FactoryReset.Tags.SetStatus, True)
+
+
+@encrypt_packet
+def request_product_info() -> Packet:
+    return Packet(
+        service_id=DeviceConfig.id,
+        command_id=DeviceConfig.ProductInfo.id,
+        command=Command(tlvs=[TLV(tag=i) for i in range(14)]),
+    )

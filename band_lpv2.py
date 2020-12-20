@@ -159,6 +159,11 @@ class Band:
         request = device_config.factory_reset(**self._credentials)
         return await self._transact(request, lambda _: _)
 
+    async def get_product_info(self):
+        request = device_config.request_product_info(**self._credentials)
+        result = await self._transact(request, lambda _: _)
+        logger.info(result)
+
     async def get_battery_level(self) -> int:
         request = device_config.request_battery_level(**self._credentials)
         return await self._transact(request, device_config.process_battery_level)
@@ -247,6 +252,8 @@ async def run(config, loop):
 
         await band.connect()
         await band.handshake()
+
+        await band.get_product_info()
 
         # await band.factory_reset()
 
