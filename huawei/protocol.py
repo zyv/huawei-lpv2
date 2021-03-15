@@ -76,6 +76,10 @@ class ChecksumError(Exception):
     def __str__(self):
         return f"Checksum mismatch: {self.checksum} != {self.exp_checksum}"
 
+class SizeError(Exception):
+    def __str__(self):
+        return f"The message is not complete, a part is missing"
+
 class VarInt:
     def __init__(self, value: int):
         if value < 0:
