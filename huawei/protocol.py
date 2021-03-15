@@ -61,6 +61,14 @@ def initialization_vector(counter: int) -> (int, bytes):
     return counter, generate_nonce()[:-4] + encode_int(counter, length=4)
 
 
+class ChecksumError(Exception):
+    def __init__(self, checksum, exp_checksum):
+        self.checksum = checksum
+        self.exp_checksum = exp_checksum
+
+    def __str__(self):
+        return f"Checksum mismatch: {self.checksum} != {self.exp_checksum}"
+
 class VarInt:
     def __init__(self, value: int):
         if value < 0:
@@ -209,7 +217,7 @@ class Packet:
         actual_checksum = encode_int(binascii.crc_hqx(data[:-2], 0))
 
         if actual_checksum != checksum:
-            raise ValueError(f"checksum mismatch: {actual_checksum} != {checksum}")
+            raise ChecksumError(actual_checksum, checksum)
 
         return Packet(service_id=payload[0], command_id=payload[1], command=Command.from_bytes(payload[2:]))
 
