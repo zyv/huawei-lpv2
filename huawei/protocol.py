@@ -61,6 +61,13 @@ def initialization_vector(counter: int) -> (int, bytes):
     return counter, generate_nonce()[:-4] + encode_int(counter, length=4)
 
 
+class MagicError(Exception):
+    def __init__(self, magic):
+        self.magic = magic
+    
+    def __str__(self):
+        return f"Magic mismatch: {self.magic} != {HUAWEI_LPV2_MAGIC}"
+
 class ChecksumError(Exception):
     def __init__(self, checksum, exp_checksum):
         self.checksum = checksum
@@ -212,7 +219,7 @@ class Packet:
         magic, _, payload, checksum = data[0], data[1:3], data[4:-2], data[-2:]
 
         if magic != ord(HUAWEI_LPV2_MAGIC):
-            raise ValueError(f"magic mismatch: {magic} != {HUAWEI_LPV2_MAGIC}")
+            raise MagicError(magic)
 
         actual_checksum = encode_int(binascii.crc_hqx(data[:-2], 0))
 
