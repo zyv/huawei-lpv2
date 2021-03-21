@@ -77,8 +77,18 @@ class ChecksumError(Exception):
         return f"Checksum mismatch: {self.checksum} != {self.exp_checksum}"
 
 class SizeError(Exception):
+    def __init__(self, packet: "Packet"):
+        self.packet = packet
+
     def __str__(self):
-        return f"The message is not complete, a part is missing"
+        return f"The packet is not complete, add data to the packet."
+
+class SlicedError(Exception):
+    def __init__(self, packet: "Packet"):
+        self.packet = packet
+
+    def __str__(self):
+        return f"The packet is sliced, add data to the packet."
 
 class VarInt:
     def __init__(self, value: int):
@@ -222,15 +232,12 @@ class Packet:
 
         size=int.from_bytes(size, 'big')
 
-        if not sliced:
-            payload = data[4:-2]
-            if size != len(payload) + 1:
-                raise SizeError()
-        else:
-            payload = data[5:-2]
-            if size != len(payload) + 2:
-                raise SizeError()
+        payload = data[4:-2]
+        if size != len(payload) + 1:
+            raise SizeError(Packet(partial_packet=data))
 
+        if sliced:
+            raise SlicedError(Packet(sliced_packet=data))
         actual_checksum = encode_int(binascii.crc_hqx(data[:-2], 0))
 
         if actual_checksum != checksum:
