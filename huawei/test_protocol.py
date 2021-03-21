@@ -3,7 +3,8 @@ import unittest
 
 from .protocol import AES_KEY_SIZE, Command, ENCRYPTION_COUNTER_MAX, HUAWEI_LPV2_MAGIC, NONCE_LENGTH, Packet, TLV, \
     VarInt, check_result, compute_digest, create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, \
-    encrypt, encrypt_packet, generate_nonce, hexlify, initialization_vector, process_result, set_status
+    encrypt, encrypt_packet, generate_nonce, hexlify, initialization_vector, process_result, set_status, \
+    SizeError, ChecksumError, MagicError
 from .services import CryptoTags, RESULT_ERROR, RESULT_SUCCESS, TAG_RESULT
 
 
@@ -158,14 +159,27 @@ class TestCommand(unittest.TestCase):
 
 class TestPacket(unittest.TestCase):
     DATA = "5A 00 08 00 01 02 03 03 61 62 63 E1 D3"
+    DATA_LIST = ["5A 00 08 00 01 02", "03 03 61 62", "63 E1 D3"]
+    FAKE_SIZE = "5A 00 07 00 01 02 03 03 61 62 63 79 87"
+    FAKE_MAGIC = "5B 00 08 00 01 02 03 03 61 62 63 39 9A"
+    FAKE_CHECKSUM = "5A 00 08 00 01 02 03 03 61 62 63 E1 D4"
     PACKET = Packet(service_id=1, command_id=2, command=Command(tlvs=[TLV(tag=3, value=b"abc")]))
 
+    def handle_messages(self):
+        packet = None
+        for pkt in self.DATA_LIST:
+            packet = Packet.handle_data(packet, pkt)
+            if packet.complete:
+                return packet
+
     def test_deserialization(self):
-        self.assertRaisesRegex(ValueError, r"packet too short", Packet.from_bytes, b"")
-        self.assertRaisesRegex(ValueError, r"magic mismatch", Packet.from_bytes, b"123456")
-        self.assertRaisesRegex(ValueError, r"checksum mismatch", Packet.from_bytes, HUAWEI_LPV2_MAGIC + b"123456")
+        self.assertRaises(ValueError, Packet.from_bytes, b"")
+        self.assertRaises(SizeError, Packet.from_bytes, bytes.fromhex(self.FAKE_SIZE))
+        self.assertRaises(MagicError, Packet.from_bytes, bytes.fromhex(self.FAKE_MAGIC))
+        self.assertRaises(ChecksumError, Packet.from_bytes, bytes.fromhex(self.FAKE_CHECKSUM))
 
         self.assertEqual(self.PACKET, Packet.from_bytes(bytes.fromhex(self.DATA)))
+        self.assertEqual(self.PACKET, self.handle_messages())
 
     def test_serialization(self):
         self.assertEqual(bytes.fromhex(self.DATA), bytes(self.PACKET))
