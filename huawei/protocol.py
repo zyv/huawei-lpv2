@@ -226,8 +226,11 @@ class Packet:
 
         return data + encode_int(binascii.crc_hqx(data, 0))
 
-    @staticmethod
-    def from_bytes(data: bytes) -> "Packet":
+    @classmethod
+    def check_data(cls, data: bytes) -> bytes:
+
+        if len(data) == 0:
+            raise ValueError()
 
         magic, size, sliced, checksum = data[0], data[1:3], data[3], data[-2:]
 
@@ -246,6 +249,13 @@ class Packet:
 
         if actual_checksum != checksum:
             raise ChecksumError(actual_checksum, checksum)
+
+        return payload
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> "Packet":
+
+        payload = cls.check_data(data)
 
         return Packet(service_id=payload[0], command_id=payload[1], command=Command.from_bytes(payload[2:]))
 
