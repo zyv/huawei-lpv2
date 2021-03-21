@@ -215,13 +215,21 @@ class Packet:
     @staticmethod
     def from_bytes(data: bytes) -> "Packet":
 
-        if len(data) < 1 + 2 + 1 + 2:
-            raise ValueError("packet too short")
-
-        magic, _, payload, checksum = data[0], data[1:3], data[4:-2], data[-2:]
+        magic, size, sliced, checksum = data[0], data[1:3], data[3], data[-2:]
 
         if magic != ord(HUAWEI_LPV2_MAGIC):
             raise MagicError(magic)
+
+        size=int.from_bytes(size, 'big')
+
+        if not sliced:
+            payload = data[4:-2]
+            if size != len(payload) + 1:
+                raise SizeError()
+        else:
+            payload = data[5:-2]
+            if size != len(payload) + 2:
+                raise SizeError()
 
         actual_checksum = encode_int(binascii.crc_hqx(data[:-2], 0))
 
