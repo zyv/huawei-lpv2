@@ -94,11 +94,13 @@ class Band:
 
     def _receive_data(self, sender: int, data: bytes):
         logger.debug(f"Current state: {self.state}, received from '{sender}': {hexlify(bytes(data))}")
-        self._packet = Packet.from_bytes(data)
-        logger.debug(f"Parsed response packet: {self._packet}")
+        self._packet = Packet.handle_data(self._packet, data)
+        if self._packet.complete:
+            logger.debug(f"Parsed response packet: {self._packet}")
+            self._packet = None
 
-        assert self.state.name.startswith("Requested"), "unexpected packet"
-        self.loop.call_soon_threadsafe(self._event.set)
+            assert self.state.name.startswith("Requested"), "unexpected packet"
+            self.loop.call_soon_threadsafe(self._event.set)
 
     async def _process_response(self, request: Packet, func: Callable, new_state: BandState):
         logger.debug(f"Waiting for response from service_id={request.service_id}, command_id={request.command_id}...")
