@@ -201,10 +201,14 @@ class Command:
 
 
 class Packet:
-    def __init__(self, service_id: int, command_id: int, command: Command):
+    def __init__(self, service_id: int = None, command_id: int = None,
+                command: Command = None, partial_packet: bytes = None,
+                sliced_packet: bytes = None):
         self.service_id = service_id
         self.command_id = command_id
         self.command = command
+        self._partial_packet = partial_packet
+        self._sliced_packet = None if sliced_packet is None else [sliced_packet]
 
     def __repr__(self):
         return f"Packet(service_id={self.service_id}, command_id={self.command_id}, command={self.command})"
@@ -251,6 +255,30 @@ class Packet:
     def decrypt(self, key: bytes, iv: bytes) -> "Packet":
         return Packet(service_id=self.service_id, command_id=self.command_id, command=self.command.decrypt(key, iv))
 
+    def add(self, data: bytes) -> bytes:
+        if self._partial_packet is not None:
+            pkt = self._partial_packet + data
+            self._partial_packet = None
+            return pkt
+        if self._sliced_packet is not None:
+            self._sliced_packet.append(data)
+            if self._get_slice_index(data) == 3:
+                return self._concat_sliced_pkt()
+            return data
+
+    def _get_slice_index(self, data: bytes) -> int:
+        return data[3]
+
+    def _concat_sliced_pkt(self) -> bytes:
+        payload = b""
+        for bpkt in self._sliced_packet:
+            payload += bpkt[5:-2]
+
+        self._sliced_packet = None
+
+        data = HUAWEI_LPV2_MAGIC + encode_int(len(payload) + 1) + b"\0" + payload
+
+        return data + encode_int(binascii.crc_hqx(data, 0))
 
 def encrypt_packet(func):
     @wraps(func)
