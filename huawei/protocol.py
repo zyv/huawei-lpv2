@@ -209,6 +209,9 @@ class Packet:
         self.command = command
         self._partial_packet = partial_packet
         self._sliced_packet = None if sliced_packet is None else [sliced_packet]
+        self.complete = True
+        if partial_packet is not None or sliced_packet is not None:
+            self.complete = False
 
     def __repr__(self):
         return f"Packet(service_id={self.service_id}, command_id={self.command_id}, command={self.command})"
@@ -268,11 +271,18 @@ class Packet:
     def add(self, data: bytes) -> bytes:
         if self._partial_packet is not None:
             pkt = self._partial_packet + data
-            self._partial_packet = None
+            try:
+                _ = self.check_data(pkt)
+            except Exception:
+                pass
+            else:
+                self._partial_packet = None
+                self.complete = True
             return pkt
         if self._sliced_packet is not None:
             self._sliced_packet.append(data)
             if self._get_slice_index(data) == 3:
+                self.complete = True
                 return self._concat_sliced_pkt()
             return data
 
