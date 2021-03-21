@@ -300,6 +300,19 @@ class Packet:
 
         return data + encode_int(binascii.crc_hqx(data, 0))
 
+    @classmethod
+    def handle_data(cls, packet: "Packet", data: bytes) -> "Packet":
+        bpacket = bytes.fromhex(data)
+        if packet is not None:
+            bpacket = packet.add(bpacket)
+        try:
+            packet = Packet.from_bytes(bpacket)
+        except SizeError as e:
+                packet = e.packet
+        except SlicedError as e:
+                packet = e.packet
+        return packet
+
 def encrypt_packet(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
