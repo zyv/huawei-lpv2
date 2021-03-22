@@ -1,0 +1,3 @@
+[tool.black]
+target = "py39"
+line-length = 120

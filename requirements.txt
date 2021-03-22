@@ -1,8 +1,10 @@
 bleak
 cryptography
+black
 nose
 coverage
 flake8
+flake8-black
 flake8-coding
 flake8-commas
 flake8-import-order
