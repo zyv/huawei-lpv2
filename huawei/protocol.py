@@ -152,11 +152,13 @@ class Command:
         return b"".join(map(bytes, self.tlvs))
 
     def encrypt(self, key: bytes, iv: bytes) -> "Command":
-        return Command(tlvs=[
-            TLV(tag=CryptoTags.Encryption, value=b"\x01"),
-            TLV(tag=CryptoTags.InitVector, value=iv),
-            TLV(tag=CryptoTags.CipherText, value=encrypt(bytes(self), key, iv)),
-        ])
+        return Command(
+            tlvs=[
+                TLV(tag=CryptoTags.Encryption, value=b"\x01"),
+                TLV(tag=CryptoTags.InitVector, value=iv),
+                TLV(tag=CryptoTags.CipherText, value=encrypt(bytes(self), key, iv)),
+            ],
+        )
 
     def decrypt(self, key: bytes, iv: bytes) -> "Command":
         return Command.from_bytes(decrypt(self[CryptoTags.CipherText].value, key, iv))
@@ -167,7 +169,7 @@ class Command:
         while len(data):
             tlv = TLV.from_bytes(data)
             tlvs.append(tlv)
-            data = data[len(tlv):]
+            data = data[len(tlv) :]
         return Command(tlvs=tlvs)
 
 
@@ -241,6 +243,7 @@ def check_result(func):
             raise ValueError(f"result code does not indicate success: {result}")
 
     if asyncio.iscoroutinefunction(func):
+
         @wraps(func)
         async def wrapper(*args, **kwargs):
             command = await func(*args, **kwargs)
@@ -250,6 +253,7 @@ def check_result(func):
 
         return wrapper
     else:
+
         @wraps(func)
         def wrapper(*args, **kwargs):
             command = args[0] if isinstance(args[0], Command) else args[1]  # support bound methods
@@ -265,9 +269,11 @@ def set_status(service_id: int, command_id: int, tag: int, value: bool) -> Packe
     return Packet(
         service_id=service_id,
         command_id=command_id,
-        command=Command(tlvs=[
-            TLV(tag=tag, value=encode_int(int(value), length=1)),
-        ]),
+        command=Command(
+            tlvs=[
+                TLV(tag=tag, value=encode_int(int(value), length=1)),
+            ],
+        ),
     )
 
 

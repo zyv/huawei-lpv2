@@ -55,9 +55,11 @@ def request_today_totals() -> Packet:
     return Packet(
         service_id=Fitness.id,
         command_id=Fitness.GetTodayTotals.id,
-        command=Command(tlvs=[
-            TLV(tag=Fitness.GetTodayTotals.Tags.Request),
-        ]),
+        command=Command(
+            tlvs=[
+                TLV(tag=Fitness.GetTodayTotals.Tags.Request),
+            ],
+        ),
     )
 
 
@@ -75,6 +77,7 @@ class ActivityTotals:
     """
     N. B. Calories fields are actually in kilocalories!
     """
+
     type: MotionType
     calories: int
     steps: Optional[int] = None
@@ -89,6 +92,7 @@ class HeartRate:
     N.B. Sadly the device returns a timestamp in local timezone instead of UTC, so confusion is possible when crossing
          timezone boundaries.
     """
+
     time: datetime
     rate: int
 
@@ -123,7 +127,8 @@ def process_today_totals(command: Command) -> TodayTotals:
                 height=fmap(decode_int, tlv, tags.Height),
                 time=fmap(lambda item: timedelta(minutes=decode_int(item)), tlv, tags.Time),
             )
-            for tlv in response.tlvs if tlv.tag == tags.Activity
+            for tlv in response.tlvs
+            if tlv.tag == tags.Activity
         ],
     )
 
@@ -136,21 +141,26 @@ class Sex(enum.Enum):
 @encrypt_packet
 def set_user_info(height: int, weight: int, sex: Sex, birth_date: date) -> Packet:
     age = int((date.today() - birth_date).days / 365.25)
-    packed_birthday = (encode_int(birth_date.year, length=2) + encode_int(birth_date.month, length=1) +
-                       encode_int(birth_date.day, length=1))
+    packed_birthday = (
+        encode_int(birth_date.year, length=2)
+        + encode_int(birth_date.month, length=1)
+        + encode_int(birth_date.day, length=1)
+    )
     tags = Fitness.SetUserInfo.Tags
     return Packet(
         service_id=Fitness.id,
         command_id=Fitness.SetUserInfo.id,
-        command=Command(tlvs=[
-            TLV(tag=tags.Height, value=encode_int(height, length=1)),
-            TLV(tag=tags.Weight, value=encode_int(weight, length=1)),
-            TLV(tag=tags.Age, value=encode_int(age, length=1)),
-            TLV(tag=tags.BirthDate, value=packed_birthday),
-            TLV(tag=tags.Sex, value=encode_int(sex.value, length=1)),
-            TLV(tag=tags.WaistMedian, value=encode_int(int(height * 0.42), length=1)),
-            TLV(tag=tags.WaistMax, value=encode_int(int(height * 0.83), length=1)),
-        ]),
+        command=Command(
+            tlvs=[
+                TLV(tag=tags.Height, value=encode_int(height, length=1)),
+                TLV(tag=tags.Weight, value=encode_int(weight, length=1)),
+                TLV(tag=tags.Age, value=encode_int(age, length=1)),
+                TLV(tag=tags.BirthDate, value=packed_birthday),
+                TLV(tag=tags.Sex, value=encode_int(sex.value, length=1)),
+                TLV(tag=tags.WaistMedian, value=encode_int(int(height * 0.42), length=1)),
+                TLV(tag=tags.WaistMax, value=encode_int(int(height * 0.83), length=1)),
+            ],
+        ),
     )
 
 

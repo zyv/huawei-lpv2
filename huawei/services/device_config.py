@@ -4,8 +4,23 @@ from datetime import datetime
 from logging import getLogger
 from typing import Tuple
 
-from ..protocol import AUTH_VERSION, Command, NONCE_LENGTH, PROTOCOL_VERSION, Packet, TLV, check_result, \
-    create_bonding_key, decode_int, digest_challenge, digest_response, encode_int, encrypt_packet, hexlify, set_status
+from ..protocol import (
+    AUTH_VERSION,
+    Command,
+    NONCE_LENGTH,
+    PROTOCOL_VERSION,
+    Packet,
+    TLV,
+    check_result,
+    create_bonding_key,
+    decode_int,
+    digest_challenge,
+    digest_response,
+    encode_int,
+    encrypt_packet,
+    hexlify,
+    set_status,
+)
 
 logger = getLogger(__name__)
 
@@ -121,12 +136,14 @@ def request_link_params() -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.LinkParams.id,
-        command=Command(tlvs=[
-            TLV(DeviceConfig.LinkParams.Tags.ProtocolVersion),
-            TLV(DeviceConfig.LinkParams.Tags.MaxFrameSize),
-            TLV(DeviceConfig.LinkParams.Tags.MaxLinkSize),
-            TLV(DeviceConfig.LinkParams.Tags.ConnectionInterval),
-        ]),
+        command=Command(
+            tlvs=[
+                TLV(DeviceConfig.LinkParams.Tags.ProtocolVersion),
+                TLV(DeviceConfig.LinkParams.Tags.MaxFrameSize),
+                TLV(DeviceConfig.LinkParams.Tags.MaxLinkSize),
+                TLV(DeviceConfig.LinkParams.Tags.ConnectionInterval),
+            ],
+        ),
     )
 
 
@@ -175,10 +192,12 @@ def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.Auth.id,
-        command=Command(tlvs=[
-            TLV(tag=DeviceConfig.Auth.Tags.Challenge, value=digest_challenge(client_nonce, server_nonce)),
-            TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(AUTH_VERSION) + client_nonce)),
-        ]),
+        command=Command(
+            tlvs=[
+                TLV(tag=DeviceConfig.Auth.Tags.Challenge, value=digest_challenge(client_nonce, server_nonce)),
+                TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(AUTH_VERSION) + client_nonce)),
+            ],
+        ),
     )
 
 
@@ -195,14 +214,16 @@ def request_bond_params(client_serial: str, client_mac: str) -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.BondParams.id,
-        command=Command(tlvs=[
-            TLV(tag=DeviceConfig.BondParams.Tags.Status),
-            TLV(tag=DeviceConfig.BondParams.Tags.ClientSerial, value=client_serial.encode()),
-            TLV(tag=DeviceConfig.BondParams.Tags.BTVersion, value=b"\x02"),
-            TLV(tag=DeviceConfig.BondParams.Tags.MaxFrameSize),
-            TLV(tag=DeviceConfig.BondParams.Tags.ClientMacAddress, value=client_mac.encode()),
-            TLV(tag=DeviceConfig.BondParams.Tags.EncryptionCounter),
-        ]),
+        command=Command(
+            tlvs=[
+                TLV(tag=DeviceConfig.BondParams.Tags.Status),
+                TLV(tag=DeviceConfig.BondParams.Tags.ClientSerial, value=client_serial.encode()),
+                TLV(tag=DeviceConfig.BondParams.Tags.BTVersion, value=b"\x02"),
+                TLV(tag=DeviceConfig.BondParams.Tags.MaxFrameSize),
+                TLV(tag=DeviceConfig.BondParams.Tags.ClientMacAddress, value=client_mac.encode()),
+                TLV(tag=DeviceConfig.BondParams.Tags.EncryptionCounter),
+            ],
+        ),
     )
 
 
@@ -232,13 +253,15 @@ def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> 
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.Bond.id,
-        command=Command(tlvs=[
-            TLV(tag=DeviceConfig.Bond.Tags.BondRequest),
-            TLV(tag=DeviceConfig.Bond.Tags.RequestCode, value=b"\x00"),
-            TLV(tag=DeviceConfig.Bond.Tags.ClientSerial, value=client_serial.encode()),
-            TLV(tag=DeviceConfig.Bond.Tags.BondingKey, value=create_bonding_key(device_mac, key, iv)),
-            TLV(tag=DeviceConfig.Bond.Tags.InitVector, value=iv),
-        ]),
+        command=Command(
+            tlvs=[
+                TLV(tag=DeviceConfig.Bond.Tags.BondRequest),
+                TLV(tag=DeviceConfig.Bond.Tags.RequestCode, value=b"\x00"),
+                TLV(tag=DeviceConfig.Bond.Tags.ClientSerial, value=client_serial.encode()),
+                TLV(tag=DeviceConfig.Bond.Tags.BondingKey, value=create_bonding_key(device_mac, key, iv)),
+                TLV(tag=DeviceConfig.Bond.Tags.InitVector, value=iv),
+            ],
+        ),
     )
 
 
@@ -255,17 +278,18 @@ class TimeFormat(enum.Enum):
 
 @encrypt_packet
 def set_date_format(date_format: DateFormat, time_format: TimeFormat) -> Packet:
+    date_format_tlvs = [
+        TLV(tag=DeviceConfig.SetDateFormat.Tags.DateFormat, value=encode_int(date_format.value, length=1)),
+        TLV(tag=DeviceConfig.SetDateFormat.Tags.TimeFormat, value=encode_int(time_format.value, length=1)),
+    ]
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.SetDateFormat.id,
-        command=Command(tlvs=[
-            TLV(tag=DeviceConfig.SetDateFormat.Tags.SetDateFormat, value=bytes(
-                Command(tlvs=[
-                    TLV(tag=DeviceConfig.SetDateFormat.Tags.DateFormat, value=encode_int(date_format.value, length=1)),
-                    TLV(tag=DeviceConfig.SetDateFormat.Tags.TimeFormat, value=encode_int(time_format.value, length=1)),
-                ]),
-            )),
-        ]),
+        command=Command(
+            tlvs=[
+                TLV(tag=DeviceConfig.SetDateFormat.Tags.SetDateFormat, value=bytes(Command(tlvs=date_format_tlvs))),
+            ],
+        ),
     )
 
 
@@ -277,10 +301,12 @@ def set_time(moment: datetime) -> Packet:
         return Packet(
             service_id=DeviceConfig.id,
             command_id=DeviceConfig.SetTime.id,
-            command=Command(tlvs=[
-                TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(timestamp), length=4)),
-                TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=zone_offset),
-            ]),
+            command=Command(
+                tlvs=[
+                    TLV(tag=DeviceConfig.SetTime.Tags.Timestamp, value=encode_int(int(timestamp), length=4)),
+                    TLV(tag=DeviceConfig.SetTime.Tags.ZoneOffset, value=zone_offset),
+                ],
+            ),
         )
 
     offset = (moment - datetime.utcfromtimestamp(moment.timestamp())).total_seconds() / 3600
@@ -295,13 +321,21 @@ def set_time(moment: datetime) -> Packet:
 @encrypt_packet
 def set_activate_on_rotate(state: bool) -> Packet:
     return set_status(
-        DeviceConfig.id, DeviceConfig.ActivateOnRotate.id, DeviceConfig.ActivateOnRotate.Tags.SetStatus, state)
+        DeviceConfig.id,
+        DeviceConfig.ActivateOnRotate.id,
+        DeviceConfig.ActivateOnRotate.Tags.SetStatus,
+        state,
+    )
 
 
 @encrypt_packet
 def set_navigate_on_rotate(state: bool) -> Packet:
     return set_status(
-        DeviceConfig.id, DeviceConfig.NavigateOnRotate.id, DeviceConfig.NavigateOnRotate.Tags.SetStatus, state)
+        DeviceConfig.id,
+        DeviceConfig.NavigateOnRotate.id,
+        DeviceConfig.NavigateOnRotate.Tags.SetStatus,
+        state,
+    )
 
 
 @encrypt_packet
@@ -309,9 +343,11 @@ def request_battery_level() -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.BatteryLevel.id,
-        command=Command(tlvs=[
-            TLV(tag=DeviceConfig.BatteryLevel.Tags.GetStatus),
-        ]),
+        command=Command(
+            tlvs=[
+                TLV(tag=DeviceConfig.BatteryLevel.Tags.GetStatus),
+            ],
+        ),
     )
 
 
@@ -323,12 +359,21 @@ def process_battery_level(command: Command):
 @encrypt_packet
 def set_right_wrist(state: bool) -> Packet:
     return set_status(
-        DeviceConfig.id, DeviceConfig.LeftRightWrist.id, DeviceConfig.LeftRightWrist.Tags.SetStatus, state)
+        DeviceConfig.id,
+        DeviceConfig.LeftRightWrist.id,
+        DeviceConfig.LeftRightWrist.Tags.SetStatus,
+        state,
+    )
 
 
 @encrypt_packet
 def factory_reset() -> Packet:
-    return set_status(DeviceConfig.id, DeviceConfig.FactoryReset.id, DeviceConfig.FactoryReset.Tags.SetStatus, True)
+    return set_status(
+        DeviceConfig.id,
+        DeviceConfig.FactoryReset.id,
+        DeviceConfig.FactoryReset.Tags.SetStatus,
+        True,
+    )
 
 
 @encrypt_packet

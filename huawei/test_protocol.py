@@ -1,9 +1,30 @@
 import asyncio
 import unittest
 
-from .protocol import AES_KEY_SIZE, Command, ENCRYPTION_COUNTER_MAX, HUAWEI_LPV2_MAGIC, NONCE_LENGTH, Packet, TLV, \
-    VarInt, check_result, compute_digest, create_bonding_key, create_secret_key, decode_int, decrypt, encode_int, \
-    encrypt, encrypt_packet, generate_nonce, hexlify, initialization_vector, process_result, set_status
+from .protocol import (
+    AES_KEY_SIZE,
+    Command,
+    ENCRYPTION_COUNTER_MAX,
+    HUAWEI_LPV2_MAGIC,
+    NONCE_LENGTH,
+    Packet,
+    TLV,
+    VarInt,
+    check_result,
+    compute_digest,
+    create_bonding_key,
+    create_secret_key,
+    decode_int,
+    decrypt,
+    encode_int,
+    encrypt,
+    encrypt_packet,
+    generate_nonce,
+    hexlify,
+    initialization_vector,
+    process_result,
+    set_status,
+)
 from .services import CryptoTags, RESULT_ERROR, RESULT_SUCCESS, TAG_RESULT
 
 
@@ -60,9 +81,7 @@ class TestUtils(unittest.TestCase):
     def test_set_status(self):
         self.assertEqual(
             set_status(1, 2, 3, False),
-            Packet(service_id=1, command_id=2, command=Command(tlvs=[
-                TLV(tag=3, value=b"\x00"),
-            ])),
+            Packet(service_id=1, command_id=2, command=Command(tlvs=[TLV(tag=3, value=b"\x00")])),
         )
 
 
@@ -99,15 +118,13 @@ class TestTLV(unittest.TestCase):
         self.assertEqual(self.TEST_TLV, TLV.from_bytes(self.TEST_BYTES))
 
     def test_nested_tlvs(self):
-        nested_tlvs = TLV(tag=132, value=bytes(Command(tlvs=[
-            TLV(tag=140, value=bytes(Command(tlvs=[
-                TLV(tag=141, value=bytes(Command(tlvs=[self.TEST_TLV]))),
-            ]))),
-        ])))
+        text_item = TLV(tag=141, value=bytes(Command(tlvs=[self.TEST_TLV])))
+        text_list = TLV(tag=140, value=bytes(Command(tlvs=[text_item])))
+        text_payload = TLV(tag=132, value=bytes(Command(tlvs=[text_list])))
 
-        self.assertEqual(132, TLV.from_bytes(bytes(nested_tlvs)).tag)
-        self.assertEqual(None, TLV.from_bytes(bytes(nested_tlvs)).command[140].command[141].command[1].command)
-        self.assertEqual([self.TEST_TLV], TLV.from_bytes(bytes(nested_tlvs)).command[140].command[141].command.tlvs)
+        self.assertEqual(132, TLV.from_bytes(bytes(text_payload)).tag)
+        self.assertEqual(None, TLV.from_bytes(bytes(text_payload)).command[140].command[141].command[1].command)
+        self.assertEqual([self.TEST_TLV], TLV.from_bytes(bytes(text_payload)).command[140].command[141].command.tlvs)
 
     def test_equality(self):
         tlv1, tlv2, tlv3 = self.TEST_TLV, TLV(tag=1, value=b"abc"), TLV(tag=1, value=b"cde")
@@ -145,10 +162,12 @@ class TestCommand(unittest.TestCase):
         key, iv = generate_nonce(), generate_nonce()
         command_encrypted = command_plain.encrypt(key, iv)
 
-        self.assertTrue(all(
-            tag in command_encrypted for tag in
-            (CryptoTags.Encryption, CryptoTags.InitVector, CryptoTags.Encryption)
-        ))
+        self.assertTrue(
+            all(
+                tag in command_encrypted
+                for tag in (CryptoTags.Encryption, CryptoTags.InitVector, CryptoTags.Encryption)
+            ),
+        )
 
         self.assertEqual(b"\x01", command_encrypted[CryptoTags.Encryption].value)
         self.assertEqual(iv, command_encrypted[CryptoTags.InitVector].value)

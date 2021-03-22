@@ -22,8 +22,10 @@ def set_locale(language_tag: str, measurement_system: int) -> Packet:
     return Packet(
         service_id=LocaleConfig.id,
         command_id=LocaleConfig.SetLocale.id,
-        command=Command(tlvs=[
-            TLV(tag=LocaleConfig.SetLocale.Tags.LanguageTag, value=language_tag.encode()),
-            TLV(tag=LocaleConfig.SetLocale.Tags.MeasurementSystem, value=encode_int(measurement_system, length=1)),
-        ]),
+        command=Command(
+            tlvs=[
+                TLV(tag=LocaleConfig.SetLocale.Tags.LanguageTag, value=language_tag.encode()),
+                TLV(tag=LocaleConfig.SetLocale.Tags.MeasurementSystem, value=encode_int(measurement_system, length=1)),
+            ],
+        ),
     )

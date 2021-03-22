@@ -1,4 +1,5 @@
 import enum
+from typing import TypeVar
 
 from ..protocol import Command, Packet, TLV, encode_int, encrypt_packet
 
@@ -61,7 +62,6 @@ TITLE_TEXT_KIND = {
     NotificationType.SMS: TextKind.Sender,
     NotificationType.WeChat: TextKind.Sender,
     NotificationType.QQ: TextKind.Sender,
-
     NotificationType.MissedCall: TextKind.Title,
     NotificationType.Email: TextKind.Title,
     NotificationType.Generic: TextKind.Title,
@@ -69,30 +69,64 @@ TITLE_TEXT_KIND = {
 
 TEXT_ENCODING = 2  # yet unclear what scheme identified as "1" is for
 
+T = TypeVar("T")
+
+
+def optional_list(item: T, condition: bool) -> list[T]:
+    return [item] if condition else []
+
+
+def text_item(kind: TextKind, content: str) -> TLV:
+    tags = Notification.Message.Tags
+
+    return TLV(
+        tag=tags.TextItem,
+        value=bytes(
+            Command(
+                tlvs=[
+                    TLV(tag=tags.TextKind, value=encode_int(kind.value, length=1)),
+                    TLV(tag=tags.TextEncoding, value=encode_int(TEXT_ENCODING, length=1)),
+                    TLV(tag=tags.TextContent, value=content.encode()),
+                ],
+            ),
+        ),
+    )
+
+
+def text_payload(notification_type: NotificationType, text: str, title: str) -> TLV:
+    return TLV(
+        tag=Notification.Message.Tags.TextList,
+        value=bytes(
+            Command(
+                tlvs=(
+                    optional_list(text_item(TITLE_TEXT_KIND[notification_type], title), title is not None)
+                    + [text_item(TextKind.Text, text)]
+                ),
+            ),
+        ),
+    )
+
 
 @encrypt_packet
-def send_notification(message_id: int, text: str, title: str, vibrate: bool,
-                      notification_type: NotificationType) -> Packet:
-    def text_item(kind: TextKind, content: str) -> TLV:
-        return TLV(tag=tags.TextItem, value=bytes(Command(tlvs=[
-            TLV(tag=tags.TextKind, value=encode_int(kind.value, length=1)),
-            TLV(tag=tags.TextEncoding, value=encode_int(TEXT_ENCODING, length=1)),
-            TLV(tag=tags.TextContent, value=content.encode()),
-        ])))
+def send_notification(
+    message_id: int,
+    text: str,
+    title: str,
+    vibrate: bool,
+    notification_type: NotificationType,
+) -> Packet:
 
     tags = Notification.Message.Tags
 
     return Packet(
         service_id=Notification.id,
         command_id=Notification.Message.id,
-        command=Command(tlvs=[
-            TLV(tag=tags.Id, value=encode_int(message_id)),
-            TLV(tag=tags.Type, value=encode_int(notification_type.value, length=1)),
-            TLV(tag=tags.Vibrate, value=encode_int(int(vibrate), length=1)),
-            TLV(tag=tags.PayloadText, value=bytes(Command(tlvs=[
-                TLV(tag=tags.TextList, value=bytes(Command(tlvs=(
-                    [text_item(TextKind.Text, text)] if title is None else
-                    [text_item(TITLE_TEXT_KIND[notification_type], title), text_item(TextKind.Text, text)]
-                )))),
-            ]))),
-        ]))
+        command=Command(
+            tlvs=[
+                TLV(tag=tags.Id, value=encode_int(message_id)),
+                TLV(tag=tags.Type, value=encode_int(notification_type.value, length=1)),
+                TLV(tag=tags.Vibrate, value=encode_int(int(vibrate), length=1)),
+                TLV(tag=tags.PayloadText, value=bytes(Command(tlvs=[text_payload(notification_type, text, title)]))),
+            ],
+        ),
+    )

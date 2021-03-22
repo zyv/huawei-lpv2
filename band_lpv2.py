@@ -10,8 +10,16 @@ from typing import Callable, Optional, Tuple
 
 from bleak import BleakClient
 
-from huawei.protocol import Command, GATT_READ, GATT_WRITE, Packet, check_result, generate_nonce, hexlify, \
-    initialization_vector
+from huawei.protocol import (
+    Command,
+    GATT_READ,
+    GATT_WRITE,
+    Packet,
+    check_result,
+    generate_nonce,
+    hexlify,
+    initialization_vector,
+)
 from huawei.services import device_config
 from huawei.services import fitness
 from huawei.services import locale_config
@@ -217,11 +225,24 @@ class Band:
         return await self._transact(request, lambda _: _)
 
     @check_result
-    async def send_notification(self, text: str, title: Optional[str] = None, vibrate: bool = False,
-                                notification_type: NotificationType = NotificationType.Generic):
+    async def send_notification(
+        self,
+        text: str,
+        title: Optional[str] = None,
+        vibrate: bool = False,
+        notification_type: NotificationType = NotificationType.Generic,
+    ):
         return await self._transact(
-            notification.send_notification(self._message_id, text, title, vibrate, notification_type,
-                                           **self._credentials), lambda _: _)
+            notification.send_notification(
+                self._message_id,
+                text,
+                title,
+                vibrate,
+                notification_type,
+                **self._credentials,
+            ),
+            lambda _: _,
+        )
 
     def _process_link_params(self, command: Command):
         assert self.state == BandState.RequestedLinkParams, "bad state"
@@ -267,7 +288,9 @@ async def run(config, loop):
         await band.set_date_format(device_config.DateFormat.YearFirst, device_config.TimeFormat.Hours24)
 
         await band.set_user_info(
-            int(config.get("height", 170)), int(config.get("weight", 60)), fitness.Sex(int(config.get("sex", 1))),
+            int(config.get("height", 170)),
+            int(config.get("weight", 60)),
+            fitness.Sex(int(config.get("sex", 1))),
             date.fromisoformat(config.get("birth_date", "1990-08-01")),
         )
 
