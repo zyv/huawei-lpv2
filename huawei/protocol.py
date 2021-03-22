@@ -40,6 +40,15 @@ GATT_WRITE = "0000fe01-0000-1000-8000-00805f9b34fb"
 GATT_READ = "0000fe02-0000-1000-8000-00805f9b34fb"
 
 
+class ProtocolError(Exception):
+    pass
+
+
+class MismatchError(ProtocolError, ValueError):
+    def __init__(self, entity, actual, expected):
+        super().__init__(f"{entity} mismatch: {actual} != {expected}")
+
+
 def encode_int(value: int, length: int = 2) -> bytes:
     return value.to_bytes(length=length, byteorder=NETWORK_BYTEORDER)
 
@@ -60,25 +69,6 @@ def initialization_vector(counter: int) -> (int, bytes):
         counter += 1
     return counter, generate_nonce()[:-4] + encode_int(counter, length=4)
 
-
-class MagicError(Exception):
-    def __init__(self, magic):
-        self.magic = magic
-    
-    def __str__(self):
-        return f"Magic mismatch: {self.magic} != {HUAWEI_LPV2_MAGIC}"
-
-class ChecksumError(Exception):
-    def __init__(self, checksum, exp_checksum):
-        self.checksum = checksum
-        self.exp_checksum = exp_checksum
-
-    def __str__(self):
-        return f"Checksum mismatch: {self.checksum} != {self.exp_checksum}"
-
-class SizeError(Exception):
-    def __str__(self):
-        return f"The message is not complete, a part is missing"
 
 class VarInt:
     def __init__(self, value: int):
@@ -207,8 +197,9 @@ class Packet:
     def __bytes__(self) -> bytes:
         payload = bytes([self.service_id, self.command_id]) + bytes(self.command)
 
-        if len(payload) > 2 ** (8 * 2):
-            raise ValueError(f"payload too large: {len(payload)}")
+        maximum_payload_length = 2 ** (8 * 2)
+        if len(payload) > maximum_payload_length:
+            raise MismatchError("payload length", len(payload), maximum_payload_length)
 
         data = HUAWEI_LPV2_MAGIC + encode_int(len(payload) + 1) + b"\0" + payload
 
@@ -217,18 +208,19 @@ class Packet:
     @staticmethod
     def from_bytes(data: bytes) -> "Packet":
 
-        if len(data) < 1 + 2 + 1 + 2:
-            raise ValueError("packet too short")
+        minimum_length = 1 + 2 + 1 + 2
+        if len(data) < minimum_length:
+            raise MismatchError("packet length", len(data), minimum_length)
 
-        magic, _, payload, checksum = data[0], data[1:3], data[4:-2], data[-2:]
+        magic, _, payload, expected_checksum = data[0], data[1:3], data[4:-2], data[-2:]
 
         if magic != ord(HUAWEI_LPV2_MAGIC):
-            raise MagicError(magic)
+            raise MismatchError("magic", magic, HUAWEI_LPV2_MAGIC)
 
         actual_checksum = encode_int(binascii.crc_hqx(data[:-2], 0))
 
-        if actual_checksum != checksum:
-            raise ChecksumError(actual_checksum, checksum)
+        if actual_checksum != expected_checksum:
+            raise MismatchError("checksum", actual_checksum, expected_checksum)
 
         return Packet(service_id=payload[0], command_id=payload[1], command=Command.from_bytes(payload[2:]))
 
@@ -259,7 +251,7 @@ def check_result(func):
     def raise_if_unsuccessful(command: Command):
         result = process_result(command)
         if result is not None and result != RESULT_SUCCESS:
-            raise ValueError(f"result code does not indicate success: {result}")
+            raise MismatchError("result code", result, RESULT_SUCCESS)
 
     if asyncio.iscoroutinefunction(func):
 
