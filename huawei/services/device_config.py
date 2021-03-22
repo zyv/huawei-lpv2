@@ -7,6 +7,7 @@ from typing import Tuple
 from ..protocol import (
     AUTH_VERSION,
     Command,
+    MismatchError,
     NONCE_LENGTH,
     PROTOCOL_VERSION,
     Packet,
@@ -169,13 +170,13 @@ def process_link_params(command: Command) -> Tuple[LinkParams, bytes]:
     # TODO: optional path extend number parsing
 
     if protocol_version != PROTOCOL_VERSION:
-        raise RuntimeError(f"protocol version mismatch: {protocol_version} != {PROTOCOL_VERSION}")
+        raise MismatchError("protocol version", protocol_version, PROTOCOL_VERSION)
 
     if auth_version != AUTH_VERSION:
-        raise RuntimeError(f"authentication scheme version mismatch: {auth_version} != {AUTH_VERSION}")
+        raise MismatchError("authentication scheme version", auth_version, AUTH_VERSION)
 
     if len(server_nonce) != NONCE_LENGTH:
-        raise RuntimeError(f"server nonce length mismatch: {len(server_nonce)} != {NONCE_LENGTH}")
+        raise MismatchError("server nonce length", len(server_nonce), NONCE_LENGTH)
 
     logger.info(
         f"Negotiated link parameters: "
@@ -204,10 +205,10 @@ def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
 @check_result
 def process_authentication(command: Command, client_nonce: bytes, server_nonce: bytes):
     expected_answer = digest_response(client_nonce, server_nonce)
-    provided_answer = command[DeviceConfig.Auth.Tags.Challenge].value
+    actual_answer = command[DeviceConfig.Auth.Tags.Challenge].value
 
-    if expected_answer != provided_answer:
-        raise ValueError(f"wrong answer to provided challenge: {expected_answer} != {provided_answer}")
+    if expected_answer != actual_answer:
+        raise MismatchError("challenge answer", actual_answer, expected_answer)
 
 
 def request_bond_params(client_serial: str, client_mac: str) -> Packet:
