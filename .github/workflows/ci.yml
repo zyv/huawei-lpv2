@@ -23,4 +23,4 @@ jobs:
         run: flake8
 
       - name: Run tests
-        run: nosetests -v --with-coverage --cover-package=huawei
+        run: pytest --cov=huawei --cov-report=term --cov-branch
