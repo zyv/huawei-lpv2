@@ -181,11 +181,13 @@ def process_link_params(command: Command) -> Tuple[LinkParams, bytes]:
         raise MismatchError("server nonce length", len(server_nonce), NONCE_LENGTH)
 
     logger.info(
-        f"Negotiated link parameters: "
-        f"{link_params.max_frame_size}, "
-        f"{link_params.max_link_size}, "
-        f"{link_params.connection_interval}, "
-        f"{hexlify(server_nonce)}",
+        "Negotiated link parameters:\n"
+        f"\tProtocol version: {protocol_version}\n"
+        f"\tMax frame size: {link_params.max_frame_size}\n"
+        f"\tMax link size: {link_params.max_link_size}\n"
+        f"\tConnection interval: {link_params.connection_interval}\n"
+        f"\tAuth version : {auth_version}"
+        f"\tServer nonce: {hexlify(server_nonce)}",
     )
 
     return link_params, server_nonce
@@ -215,6 +217,7 @@ def process_authentication(auth_version: int, command: Command, client_nonce: by
     if expected_answer != actual_answer:
         raise MismatchError("challenge answer", actual_answer, expected_answer)
 
+    logger.info("Process authentication: \n\tCheck")
 
 def request_bond_params(client_serial: str, client_mac: str) -> Packet:
     return Packet(
@@ -244,12 +247,12 @@ def process_bond_params(command: Command) -> Tuple[int, int]:
     # TODO: check bond status
 
     logger.info(
-        f"Negotiated bond params: "
-        f"{bond_status}, "
-        f"{bond_status_info}, "
-        f"{bt_version}, "
-        f"{max_frame_size}, "
-        f"{encryption_counter}",
+        f"Negotiated bond params:\n"
+        f"\tBond status: {bond_status}\n"
+        f"\tBond status info: {bond_status_info}\n"
+        f"\tBT version: {bt_version}\n"
+        f"\tMax frame size: {max_frame_size}\n"
+        f"\tEncryption counter: {encryption_counter}",
     )
 
     return max_frame_size, encryption_counter
