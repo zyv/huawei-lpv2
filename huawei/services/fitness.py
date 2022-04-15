@@ -112,16 +112,21 @@ def process_today_totals(command: Command) -> TodayTotals:
     def fmap(func: Callable, item: TLV, tag: int) -> Optional[int]:
         return func(item.command[tag].value) if tag in item.command else None
 
-    return TodayTotals(
-        calories=(decode_int(response[tags.TotalCalories].value)),
-        heart_rate=HeartRate(
+    if tags.HeartRate in response:
+        heart_rate = HeartRate(
             time=datetime.fromtimestamp(decode_int(response[tags.HeartRate].value[:-1])),
             rate=decode_int(response[tags.HeartRate].value[-1:]),
-        ),
+        )
+    else:
+        heart_rate = 0
+
+    return TodayTotals(
+        calories=(decode_int(response[tags.TotalCalories].value)),
+        heart_rate=heart_rate,
         activities=[
             ActivityTotals(
                 type=MotionType(decode_int(tlv.command[tags.MotionType].value)),
-                calories=decode_int(tlv.command[tags.Calories].value),
+                calories=fmap(decode_int, tlv, tags.Calories),
                 steps=fmap(decode_int, tlv, tags.Steps),
                 distance=fmap(decode_int, tlv, tags.Distance),
                 height=fmap(decode_int, tlv, tags.Height),

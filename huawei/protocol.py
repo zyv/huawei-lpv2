@@ -20,17 +20,36 @@ HUAWEI_LPV2_MAGIC = b"\x5A"
 
 
 PROTOCOL_VERSION = 2
-AUTH_VERSION = 1
+AUTH_VERSIONS = [1, 2, 3]
 
 NETWORK_BYTEORDER = "big"
 
-DIGEST_SECRET = "70 FB 6C 24 03 5F DB 55 2F 38 89 8A EE DE 3F 69"
+DIGEST_SECRETS = [
+    "70 FB 6C 24 03 5F DB 55 2F 38 89 8A EE DE 3F 69",  # Authentication V1
+    "93 AC DE F7 6A CB 09 85 7D BF E5 26 1A AB CD 78",  # Authentication V2
+    "9C 27 63 A9 CC E1 34 76 6D E3 FF 61 18 20 05 53",  # Authentication V3
+]
 
 MESSAGE_RESPONSE = "0110"
 MESSAGE_CHALLENGE = "0100"
 
-SECRET_KEY_1 = "6F 75 6A 79 6D 77 71 34 63 6C 76 39 33 37 38 79"
-SECRET_KEY_2 = "62 31 30 6A 67 66 64 39 79 37 76 73 75 64 61 39"
+SECRET_KEYS = [
+    # Authentication V1
+    [
+        "6F 75 6A 79 6D 77 71 34 63 6C 76 39 33 37 38 79",
+        "62 31 30 6A 67 66 64 39 79 37 76 73 75 64 61 39",
+    ],
+    # Authentication V2
+    [
+        "55 53 86 FC 63 20 07 AA 86 49 35 22 B8 6A E2 5C",
+        "33 07 9B C5 7A 88 6D 3C F5 61 37 09 6F 22 80 00",
+    ],
+    # Authentication V3
+    [
+        "55 53 86 FC 63 20 07 AA 86 49 35 22 B8 6A E2 5C",
+        "33 07 9B C5 7A 88 6D 3C F5 61 37 09 6F 22 80 00",
+    ],
+]
 
 AES_KEY_SIZE = 16
 NONCE_LENGTH = 16
@@ -289,21 +308,21 @@ def set_status(service_id: int, command_id: int, tag: int, value: bool) -> Packe
     )
 
 
-def compute_digest(message: str, client_nonce: bytes, server_nonce: bytes):
+def compute_digest(auth_version: int, message: str, client_nonce: bytes, server_nonce: bytes):
     complete_nonce = server_nonce + client_nonce
 
     def digest(key: bytes, msg: bytes):
         return hmac.new(key, msg=msg, digestmod=hashlib.sha256).digest()
 
-    return digest(digest(bytes.fromhex(DIGEST_SECRET + message), complete_nonce), complete_nonce)
+    return digest(digest(bytes.fromhex(DIGEST_SECRETS[auth_version - 1] + message), complete_nonce), complete_nonce)
 
 
-def digest_challenge(client_nonce: bytes, server_nonce: bytes):
-    return compute_digest(MESSAGE_CHALLENGE, client_nonce, server_nonce)
+def digest_challenge(auth_version: int, client_nonce: bytes, server_nonce: bytes):
+    return compute_digest(auth_version, MESSAGE_RESPONSE, client_nonce, server_nonce)
 
 
-def digest_response(client_nonce: bytes, server_nonce: bytes):
-    return compute_digest(MESSAGE_RESPONSE, client_nonce, server_nonce)
+def digest_response(auth_version: int, client_nonce: bytes, server_nonce: bytes):
+    return compute_digest(auth_version, MESSAGE_RESPONSE, client_nonce, server_nonce)
 
 
 def generate_nonce() -> bytes:
@@ -331,12 +350,14 @@ def decrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
     return unpadder.update(padded_data) + unpadder.finalize()
 
 
-def create_secret_key(mac_address: str) -> bytes:
+def create_secret_key(auth_version: int, mac_address: str) -> bytes:
     mac_address_key = (mac_address.replace(":", "") + "0000").encode()
 
     mixed_secret_key = [
         ((key1_byte << 4) ^ key2_byte) & 0xFF
-        for key1_byte, key2_byte in zip(bytes.fromhex(SECRET_KEY_1), bytes.fromhex(SECRET_KEY_2))
+        for key1_byte, key2_byte in zip(
+            bytes.fromhex(SECRET_KEYS[auth_version - 1][0]), bytes.fromhex(SECRET_KEYS[auth_version - 1][1])
+        )
     ]
 
     mixed_secret_key_hash = hashlib.sha256(bytes(mixed_secret_key)).digest()
@@ -349,5 +370,5 @@ def create_secret_key(mac_address: str) -> bytes:
     return hashlib.sha256(bytes(final_mixed_key)).digest()[:AES_KEY_SIZE]
 
 
-def create_bonding_key(mac_address: str, key: bytes, iv: bytes) -> bytes:
-    return encrypt(key, create_secret_key(mac_address), iv)
+def create_bonding_key(auth_version: int, mac_address: str, key: bytes, iv: bytes) -> bytes:
+    return encrypt(key, create_secret_key(auth_version, mac_address), iv)

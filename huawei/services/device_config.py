@@ -5,7 +5,7 @@ from logging import getLogger
 from typing import Tuple
 
 from ..protocol import (
-    AUTH_VERSION,
+    AUTH_VERSIONS,
     NONCE_LENGTH,
     PROTOCOL_VERSION,
     TLV,
@@ -153,27 +153,29 @@ class LinkParams:
     max_frame_size: int
     max_link_size: int
     connection_interval: int  # milliseconds
+    auth_version: int
 
 
 @check_result
 def process_link_params(command: Command) -> Tuple[LinkParams, bytes]:
+    protocol_version = decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)
+    auth_version = decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])
+    server_nonce = bytes(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[2:18])
+
     link_params = LinkParams(
         max_frame_size=decode_int(command[DeviceConfig.LinkParams.Tags.MaxFrameSize].value),
         max_link_size=decode_int(command[DeviceConfig.LinkParams.Tags.MaxLinkSize].value),
         connection_interval=decode_int(command[DeviceConfig.LinkParams.Tags.ConnectionInterval].value),
+        auth_version=auth_version,
     )
-
-    protocol_version = decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)
-    auth_version = decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])
-    server_nonce = bytes(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[2:18])
 
     # TODO: optional path extend number parsing
 
     if protocol_version != PROTOCOL_VERSION:
         raise MismatchError("protocol version", protocol_version, PROTOCOL_VERSION)
 
-    if auth_version != AUTH_VERSION:
-        raise MismatchError("authentication scheme version", auth_version, AUTH_VERSION)
+    if not auth_version in AUTH_VERSIONS:
+        raise MismatchError("authentication scheme version", auth_version, AUTH_VERSIONS)
 
     if len(server_nonce) != NONCE_LENGTH:
         raise MismatchError("server nonce length", len(server_nonce), NONCE_LENGTH)
@@ -189,22 +191,25 @@ def process_link_params(command: Command) -> Tuple[LinkParams, bytes]:
     return link_params, server_nonce
 
 
-def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
+def request_authentication(auth_version: int, client_nonce: bytes, server_nonce: bytes) -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.Auth.id,
         command=Command(
             tlvs=[
-                TLV(tag=DeviceConfig.Auth.Tags.Challenge, value=digest_challenge(client_nonce, server_nonce)),
-                TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(AUTH_VERSION) + client_nonce)),
+                TLV(
+                    tag=DeviceConfig.Auth.Tags.Challenge,
+                    value=digest_challenge(auth_version, client_nonce, server_nonce),
+                ),
+                TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(auth_version) + client_nonce)),
             ],
         ),
     )
 
 
 @check_result
-def process_authentication(command: Command, client_nonce: bytes, server_nonce: bytes):
-    expected_answer = digest_response(client_nonce, server_nonce)
+def process_authentication(auth_version: int, command: Command, client_nonce: bytes, server_nonce: bytes):
+    expected_answer = digest_response(auth_version, client_nonce, server_nonce)
     actual_answer = command[DeviceConfig.Auth.Tags.Challenge].value
 
     if expected_answer != actual_answer:
@@ -250,7 +255,7 @@ def process_bond_params(command: Command) -> Tuple[int, int]:
     return max_frame_size, encryption_counter
 
 
-def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> Packet:
+def request_bond(auth_version: int, client_serial: str, device_mac: str, key: bytes, iv: bytes) -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.Bond.id,
@@ -259,7 +264,7 @@ def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> 
                 TLV(tag=DeviceConfig.Bond.Tags.BondRequest),
                 TLV(tag=DeviceConfig.Bond.Tags.RequestCode, value=b"\x00"),
                 TLV(tag=DeviceConfig.Bond.Tags.ClientSerial, value=client_serial.encode()),
-                TLV(tag=DeviceConfig.Bond.Tags.BondingKey, value=create_bonding_key(device_mac, key, iv)),
+                TLV(tag=DeviceConfig.Bond.Tags.BondingKey, value=create_bonding_key(auth_version, device_mac, key, iv)),
                 TLV(tag=DeviceConfig.Bond.Tags.InitVector, value=iv),
             ],
         ),

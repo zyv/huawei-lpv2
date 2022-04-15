@@ -143,7 +143,9 @@ class Band:
         states = (BandState.RequestedLinkParams, BandState.ReceivedLinkParams)
         await self._transact(request, self._process_link_params, states)
 
-        request = device_config.request_authentication(self._client_nonce, self._server_nonce)
+        request = device_config.request_authentication(
+            self.link_params.auth_version, self._client_nonce, self._server_nonce
+        )
         states = (BandState.RequestedAuthentication, BandState.ReceivedAuthentication)
         await self._transact(request, self._process_authentication, states)
 
@@ -152,7 +154,9 @@ class Band:
         await self._transact(request, self._process_bond_params, states)
 
         # TODO: not needed if status is already correct
-        request = device_config.request_bond(self.client_serial, self.device_mac, **self._credentials)
+        request = device_config.request_bond(
+            self.link_params.auth_version, self.client_serial, self.device_mac, **self._credentials
+        )
         states = (BandState.RequestedBond, BandState.ReceivedBond)
         await self._transact(request, self._process_bond, states)
 
@@ -247,7 +251,9 @@ class Band:
 
     def _process_authentication(self, command: Command):
         assert self.state == BandState.RequestedAuthentication, "bad state"
-        device_config.process_authentication(command, self._client_nonce, self._server_nonce)
+        device_config.process_authentication(
+            self.link_params.auth_version, command, self._client_nonce, self._server_nonce
+        )
 
     def _process_bond_params(self, command: Command):
         assert self.state == BandState.RequestedBondParams, "bad state"
