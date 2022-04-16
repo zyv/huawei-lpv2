@@ -125,7 +125,7 @@ class Band:
         return await self._process_response(request, func, target_state)
 
     async def connect(self):
-        if not await self.client.is_connected():
+        if not self.client.is_connected:
             await self.client.connect()
         await self.client.start_notify(GATT_READ, self._receive_data)
         self.state = BandState.Connected
