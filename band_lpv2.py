@@ -11,19 +11,16 @@ from typing import Callable, Optional, Tuple
 from bleak import BleakClient
 
 from huawei.protocol import (
-    Command,
     GATT_READ,
     GATT_WRITE,
+    Command,
     Packet,
     check_result,
     generate_nonce,
     hexlify,
     initialization_vector,
 )
-from huawei.services import device_config
-from huawei.services import fitness
-from huawei.services import locale_config
-from huawei.services import notification
+from huawei.services import device_config, fitness, locale_config, notification
 from huawei.services.notification import NotificationType
 
 logging.basicConfig(level=logging.DEBUG)

@@ -1,4 +1,4 @@
-from ..protocol import Command, Packet, TLV, encode_int, encrypt_packet
+from ..protocol import TLV, Command, Packet, encode_int, encrypt_packet
 
 
 class LocaleConfig:

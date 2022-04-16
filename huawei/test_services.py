@@ -2,7 +2,7 @@ import unittest
 from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
-from .protocol import Command, Packet, TLV, generate_nonce
+from .protocol import TLV, Command, Packet, generate_nonce
 from .services import fitness
 from .services.fitness import ActivityTotals, HeartRate, MotionType, TodayTotals
 

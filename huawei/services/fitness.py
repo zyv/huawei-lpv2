@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Callable, List, Optional
 
-from ..protocol import Command, Packet, TLV, check_result, decode_int, encode_int, encrypt_packet, set_status
+from ..protocol import TLV, Command, Packet, check_result, decode_int, encode_int, encrypt_packet, set_status
 
 
 class Fitness:

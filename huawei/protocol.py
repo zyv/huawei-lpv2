@@ -12,11 +12,12 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from .services import CryptoTags, RESULT_SUCCESS, TAG_RESULT
+from .services import RESULT_SUCCESS, TAG_RESULT, CryptoTags
 
 logger = getLogger(__name__)
 
 HUAWEI_LPV2_MAGIC = b"\x5A"
+
 
 PROTOCOL_VERSION = 2
 AUTH_VERSION = 1
@@ -86,7 +87,7 @@ class VarInt:
         return self._value
 
     def __len__(self):
-        return math.ceil(math.log(self._value + 1, 2 ** 7)) if self._value > 2 else 1
+        return math.ceil(math.log(self._value + 1, 2**7)) if self._value > 2 else 1
 
     def __bytes__(self):
         data = []

@@ -6,12 +6,12 @@ from typing import Tuple
 
 from ..protocol import (
     AUTH_VERSION,
-    Command,
-    MismatchError,
     NONCE_LENGTH,
     PROTOCOL_VERSION,
-    Packet,
     TLV,
+    Command,
+    MismatchError,
+    Packet,
     check_result,
     create_bonding_key,
     decode_int,

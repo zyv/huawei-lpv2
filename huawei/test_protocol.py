@@ -3,13 +3,13 @@ import unittest
 
 from .protocol import (
     AES_KEY_SIZE,
-    Command,
     ENCRYPTION_COUNTER_MAX,
     HUAWEI_LPV2_MAGIC,
-    MismatchError,
     NONCE_LENGTH,
-    Packet,
     TLV,
+    Command,
+    MismatchError,
+    Packet,
     VarInt,
     check_result,
     compute_digest,
@@ -26,7 +26,7 @@ from .protocol import (
     process_result,
     set_status,
 )
-from .services import CryptoTags, RESULT_ERROR, RESULT_SUCCESS, TAG_RESULT
+from .services import RESULT_ERROR, RESULT_SUCCESS, TAG_RESULT, CryptoTags
 
 
 class TestUtils(unittest.TestCase):
