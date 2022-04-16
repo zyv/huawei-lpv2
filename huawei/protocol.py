@@ -1,12 +1,13 @@
 import asyncio
 import binascii
+import enum
 import hashlib
 import hmac
 import math
 import secrets
 from functools import wraps
 from logging import getLogger
-from typing import List, Optional
+from typing import Optional
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
@@ -17,39 +18,41 @@ from .services import RESULT_SUCCESS, TAG_RESULT, CryptoTags
 logger = getLogger(__name__)
 
 HUAWEI_LPV2_MAGIC = b"\x5A"
-
-
 PROTOCOL_VERSION = 2
-AUTH_VERSIONS = [1, 2, 3]
+
+
+@enum.unique
+class AuthVersion(enum.IntEnum):
+    V1 = 1
+    V2 = 2
+    V3 = 3
+
 
 NETWORK_BYTEORDER = "big"
 
-DIGEST_SECRETS = [
-    "70 FB 6C 24 03 5F DB 55 2F 38 89 8A EE DE 3F 69",  # Authentication V1
-    "93 AC DE F7 6A CB 09 85 7D BF E5 26 1A AB CD 78",  # Authentication V2
-    "9C 27 63 A9 CC E1 34 76 6D E3 FF 61 18 20 05 53",  # Authentication V3
-]
+DIGEST_SECRETS = {
+    AuthVersion.V1: "70 FB 6C 24 03 5F DB 55 2F 38 89 8A EE DE 3F 69",
+    AuthVersion.V2: "93 AC DE F7 6A CB 09 85 7D BF E5 26 1A AB CD 78",
+    AuthVersion.V3: "9C 27 63 A9 CC E1 34 76 6D E3 FF 61 18 20 05 53",
+}
 
 MESSAGE_RESPONSE = "0110"
 MESSAGE_CHALLENGE = "0100"
 
-SECRET_KEYS = [
-    # Authentication V1
-    [
+SECRET_KEYS = {
+    AuthVersion.V1: (
         "6F 75 6A 79 6D 77 71 34 63 6C 76 39 33 37 38 79",
         "62 31 30 6A 67 66 64 39 79 37 76 73 75 64 61 39",
-    ],
-    # Authentication V2
-    [
+    ),
+    AuthVersion.V2: (
         "55 53 86 FC 63 20 07 AA 86 49 35 22 B8 6A E2 5C",
         "33 07 9B C5 7A 88 6D 3C F5 61 37 09 6F 22 80 00",
-    ],
-    # Authentication V3
-    [
+    ),
+    AuthVersion.V3: (
         "55 53 86 FC 63 20 07 AA 86 49 35 22 B8 6A E2 5C",
         "33 07 9B C5 7A 88 6D 3C F5 61 37 09 6F 22 80 00",
-    ],
-]
+    ),
+}
 
 AES_KEY_SIZE = 16
 NONCE_LENGTH = 16
@@ -162,7 +165,7 @@ class TLV:
 
 
 class Command:
-    def __init__(self, tlvs: List[TLV] = None):
+    def __init__(self, tlvs: list[TLV] = None):
         self.tlvs = tlvs if tlvs is not None else []
 
     def __repr__(self):
@@ -308,20 +311,20 @@ def set_status(service_id: int, command_id: int, tag: int, value: bool) -> Packe
     )
 
 
-def compute_digest(auth_version: int, message: str, client_nonce: bytes, server_nonce: bytes):
+def compute_digest(auth_version: AuthVersion, message: str, client_nonce: bytes, server_nonce: bytes):
     complete_nonce = server_nonce + client_nonce
 
     def digest(key: bytes, msg: bytes):
         return hmac.new(key, msg=msg, digestmod=hashlib.sha256).digest()
 
-    return digest(digest(bytes.fromhex(DIGEST_SECRETS[auth_version - 1] + message), complete_nonce), complete_nonce)
+    return digest(digest(bytes.fromhex(DIGEST_SECRETS[auth_version] + message), complete_nonce), complete_nonce)
 
 
-def digest_challenge(auth_version: int, client_nonce: bytes, server_nonce: bytes):
+def digest_challenge(auth_version: AuthVersion, client_nonce: bytes, server_nonce: bytes):
     return compute_digest(auth_version, MESSAGE_RESPONSE, client_nonce, server_nonce)
 
 
-def digest_response(auth_version: int, client_nonce: bytes, server_nonce: bytes):
+def digest_response(auth_version: AuthVersion, client_nonce: bytes, server_nonce: bytes):
     return compute_digest(auth_version, MESSAGE_RESPONSE, client_nonce, server_nonce)
 
 
@@ -350,26 +353,24 @@ def decrypt(data: bytes, key: bytes, iv: bytes) -> bytes:
     return unpadder.update(padded_data) + unpadder.finalize()
 
 
-def create_secret_key(auth_version: int, mac_address: str) -> bytes:
+def create_secret_key(auth_version: AuthVersion, mac_address: str) -> bytes:
     mac_address_key = (mac_address.replace(":", "") + "0000").encode()
 
-    mixed_secret_key = [
-        ((key1_byte << 4) ^ key2_byte) & 0xFF
-        for key1_byte, key2_byte in zip(
-            bytes.fromhex(SECRET_KEYS[auth_version - 1][0]),
-            bytes.fromhex(SECRET_KEYS[auth_version - 1][1]),
-        )
-    ]
+    left_key, right_key = map(bytes.fromhex, SECRET_KEYS[auth_version])
+
+    mixed_secret_key = (
+        ((left_key_byte << 4) ^ right_key_byte) & 0xFF for left_key_byte, right_key_byte in zip(left_key, right_key)
+    )
 
     mixed_secret_key_hash = hashlib.sha256(bytes(mixed_secret_key)).digest()
 
-    final_mixed_key = [
-        ((mixed_key_hash_byte >> 6) ^ mac_address_byte) & 0xFF
-        for mixed_key_hash_byte, mac_address_byte in zip(mixed_secret_key_hash, mac_address_key)
-    ]
+    final_mixed_key = (
+        ((mixed_secret_key_hash_byte >> 6) ^ mac_address_byte) & 0xFF
+        for mixed_secret_key_hash_byte, mac_address_byte in zip(mixed_secret_key_hash, mac_address_key)
+    )
 
     return hashlib.sha256(bytes(final_mixed_key)).digest()[:AES_KEY_SIZE]
 
 
-def create_bonding_key(auth_version: int, mac_address: str, key: bytes, iv: bytes) -> bytes:
+def create_bonding_key(auth_version: AuthVersion, mac_address: str, key: bytes, iv: bytes) -> bytes:
     return encrypt(key, create_secret_key(auth_version, mac_address), iv)

@@ -7,6 +7,7 @@ from .protocol import (
     HUAWEI_LPV2_MAGIC,
     NONCE_LENGTH,
     TLV,
+    AuthVersion,
     Command,
     MismatchError,
     Packet,
@@ -208,10 +209,10 @@ class TestCrypto(unittest.TestCase):
         self.assertEqual(AES_KEY_SIZE, len(generate_nonce()))
 
     def test_digest(self):
-        self.assertEqual(bytes.fromhex(self.DIGEST), compute_digest("", b"", b""))
+        self.assertEqual(bytes.fromhex(self.DIGEST), compute_digest(AuthVersion.V1, "", b"", b""))
 
     def test_secret_key(self):
-        self.assertEqual(self.SECRET_KEY, create_secret_key(self.MAC_ADDRESS))
+        self.assertEqual(self.SECRET_KEY, create_secret_key(AuthVersion.V1, self.MAC_ADDRESS))
 
     def test_roundtrip(self):
         data, key, iv = generate_nonce() + b"abc", generate_nonce(), generate_nonce()
@@ -219,5 +220,5 @@ class TestCrypto(unittest.TestCase):
 
     def test_bonding_key(self):
         key, iv = generate_nonce(), generate_nonce()
-        bonding_key = create_bonding_key(self.MAC_ADDRESS, key, iv)
+        bonding_key = create_bonding_key(AuthVersion.V1, self.MAC_ADDRESS, key, iv)
         self.assertEqual(key, decrypt(bonding_key, self.SECRET_KEY, iv))

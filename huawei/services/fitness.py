@@ -1,7 +1,7 @@
 import enum
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Callable, List, Optional
+from typing import Callable, Optional
 
 from ..protocol import TLV, Command, Packet, check_result, decode_int, encode_int, encrypt_packet, set_status
 
@@ -101,7 +101,7 @@ class HeartRate:
 class TodayTotals:
     calories: int
     heart_rate: HeartRate
-    activities: List[ActivityTotals]
+    activities: list[ActivityTotals]
 
 
 @check_result
