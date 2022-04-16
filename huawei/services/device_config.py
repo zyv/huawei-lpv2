@@ -174,7 +174,7 @@ def process_link_params(command: Command) -> Tuple[LinkParams, bytes]:
     if protocol_version != PROTOCOL_VERSION:
         raise MismatchError("protocol version", protocol_version, PROTOCOL_VERSION)
 
-    if not auth_version in AUTH_VERSIONS:
+    if auth_version not in AUTH_VERSIONS:
         raise MismatchError("authentication scheme version", auth_version, AUTH_VERSIONS)
 
     if len(server_nonce) != NONCE_LENGTH:

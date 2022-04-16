@@ -356,7 +356,8 @@ def create_secret_key(auth_version: int, mac_address: str) -> bytes:
     mixed_secret_key = [
         ((key1_byte << 4) ^ key2_byte) & 0xFF
         for key1_byte, key2_byte in zip(
-            bytes.fromhex(SECRET_KEYS[auth_version - 1][0]), bytes.fromhex(SECRET_KEYS[auth_version - 1][1])
+            bytes.fromhex(SECRET_KEYS[auth_version - 1][0]),
+            bytes.fromhex(SECRET_KEYS[auth_version - 1][1]),
         )
     ]
 
