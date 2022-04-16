@@ -17,8 +17,10 @@ from .services import RESULT_SUCCESS, TAG_RESULT, CryptoTags
 
 logger = getLogger(__name__)
 
-HUAWEI_LPV2_MAGIC = b"\x5A"
-PROTOCOL_VERSION = 2
+
+@enum.unique
+class ProtocolVersion(enum.IntEnum):
+    V2 = 2
 
 
 @enum.unique
@@ -27,6 +29,8 @@ class AuthVersion(enum.IntEnum):
     V2 = 2
     V3 = 3
 
+
+HUAWEI_LPV2_MAGIC = b"\x5A"
 
 NETWORK_BYTEORDER = "big"
 

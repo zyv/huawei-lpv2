@@ -5,13 +5,13 @@ from logging import getLogger
 from typing import Tuple
 
 from ..protocol import (
-    AUTH_VERSIONS,
     NONCE_LENGTH,
-    PROTOCOL_VERSION,
     TLV,
+    AuthVersion,
     Command,
     MismatchError,
     Packet,
+    ProtocolVersion,
     check_result,
     create_bonding_key,
     decode_int,
@@ -150,50 +150,54 @@ def request_link_params() -> Packet:
 
 @dataclass
 class LinkParams:
+    protocol_version: ProtocolVersion
     max_frame_size: int
     max_link_size: int
     connection_interval: int  # milliseconds
-    auth_version: int
+    auth_version: AuthVersion
 
 
 @check_result
 def process_link_params(command: Command) -> Tuple[LinkParams, bytes]:
-    protocol_version = decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)
-    auth_version = decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])
-    server_nonce = bytes(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[2:18])
-
     link_params = LinkParams(
+        protocol_version=ProtocolVersion(decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)),
         max_frame_size=decode_int(command[DeviceConfig.LinkParams.Tags.MaxFrameSize].value),
         max_link_size=decode_int(command[DeviceConfig.LinkParams.Tags.MaxLinkSize].value),
         connection_interval=decode_int(command[DeviceConfig.LinkParams.Tags.ConnectionInterval].value),
-        auth_version=auth_version,
+        auth_version=AuthVersion(decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])),
     )
+
+    server_nonce = bytes(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[2:18])
 
     # TODO: optional path extend number parsing
 
-    if protocol_version != PROTOCOL_VERSION:
-        raise MismatchError("protocol version", protocol_version, PROTOCOL_VERSION)
+    if link_params.protocol_version != ProtocolVersion.V2:
+        raise MismatchError("protocol version", link_params.protocol_version, tuple(ProtocolVersion))
 
-    if auth_version not in AUTH_VERSIONS:
-        raise MismatchError("authentication scheme version", auth_version, AUTH_VERSIONS)
+    if link_params.auth_version not in AuthVersion:
+        raise MismatchError("authentication scheme version", link_params.auth_version, tuple(AuthVersion))
 
     if len(server_nonce) != NONCE_LENGTH:
         raise MismatchError("server nonce length", len(server_nonce), NONCE_LENGTH)
 
     logger.info(
-        "Negotiated link parameters:\n"
-        f"\tProtocol version: {protocol_version}\n"
-        f"\tMax frame size: {link_params.max_frame_size}\n"
-        f"\tMax link size: {link_params.max_link_size}\n"
-        f"\tConnection interval: {link_params.connection_interval}\n"
-        f"\tAuth version : {auth_version}"
-        f"\tServer nonce: {hexlify(server_nonce)}",
+        "Negotiated link parameters:\n\t"
+        "\n\t".join(
+            (
+                f"Protocol version: {link_params.protocol_version}",
+                f"Max frame size: {link_params.max_frame_size}",
+                f"Max link size: {link_params.max_link_size}",
+                f"Connection interval: {link_params.connection_interval}",
+                f"Auth version : {link_params.auth_version}",
+                f"Server nonce: {hexlify(server_nonce)}",
+            ),
+        ),
     )
 
     return link_params, server_nonce
 
 
-def request_authentication(auth_version: int, client_nonce: bytes, server_nonce: bytes) -> Packet:
+def request_authentication(auth_version: AuthVersion, client_nonce: bytes, server_nonce: bytes) -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.Auth.id,
@@ -210,14 +214,14 @@ def request_authentication(auth_version: int, client_nonce: bytes, server_nonce:
 
 
 @check_result
-def process_authentication(auth_version: int, command: Command, client_nonce: bytes, server_nonce: bytes):
+def process_authentication(auth_version: AuthVersion, command: Command, client_nonce: bytes, server_nonce: bytes):
     expected_answer = digest_response(auth_version, client_nonce, server_nonce)
     actual_answer = command[DeviceConfig.Auth.Tags.Challenge].value
 
     if expected_answer != actual_answer:
         raise MismatchError("challenge answer", actual_answer, expected_answer)
 
-    logger.info("Process authentication: \n\tCheck")
+    logger.info("Process authentication:\n\tDone!")
 
 
 def request_bond_params(client_serial: str, client_mac: str) -> Packet:
@@ -248,18 +252,22 @@ def process_bond_params(command: Command) -> Tuple[int, int]:
     # TODO: check bond status
 
     logger.info(
-        f"Negotiated bond params:\n"
-        f"\tBond status: {bond_status}\n"
-        f"\tBond status info: {bond_status_info}\n"
-        f"\tBT version: {bt_version}\n"
-        f"\tMax frame size: {max_frame_size}\n"
-        f"\tEncryption counter: {encryption_counter}",
+        "Negotiated bond params:\n\t"
+        "\n\t".join(
+            (
+                f"Bond status: {bond_status}",
+                f"Bond status info: {bond_status_info}",
+                f"BT version: {bt_version}",
+                f"Max frame size: {max_frame_size}",
+                f"Encryption counter: {encryption_counter}",
+            ),
+        ),
     )
 
     return max_frame_size, encryption_counter
 
 
-def request_bond(auth_version: int, client_serial: str, device_mac: str, key: bytes, iv: bytes) -> Packet:
+def request_bond(auth_version: AuthVersion, client_serial: str, device_mac: str, key: bytes, iv: bytes) -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.Bond.id,
