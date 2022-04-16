@@ -1,6 +1,6 @@
-import enum
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from enum import IntEnum, unique
 from typing import Callable, Optional
 
 from ..protocol import TLV, Command, Packet, check_result, decode_int, encode_int, encrypt_packet, set_status
@@ -12,7 +12,8 @@ class Fitness:
     class SetUserInfo:
         id = 2
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Height = 1
             Weight = 2
             Age = 3
@@ -24,7 +25,8 @@ class Fitness:
     class GetTodayTotals:
         id = 3
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Request = 1
             TotalCalories = 2
             MotionType = 4
@@ -40,13 +42,15 @@ class Fitness:
     class TruSleepState:
         id = 22
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
     class HRMonitorState:
         id = 23
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
 
@@ -63,7 +67,8 @@ def request_today_totals() -> Packet:
     )
 
 
-class MotionType(enum.Enum):
+@unique
+class MotionType(IntEnum):
     Walking = 1
     Running = 2
     Climbing = 3
@@ -137,7 +142,8 @@ def process_today_totals(command: Command) -> TodayTotals:
     )
 
 
-class Sex(enum.Enum):
+@unique
+class Sex(IntEnum):
     Male = 1
     Female = 2
 

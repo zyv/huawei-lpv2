@@ -30,7 +30,8 @@ DEVICE_NAME = "default"
 CONFIG_FILE = Path("band.ini")
 
 
-class BandState(enum.Enum):
+@enum.unique
+class BandState(enum.IntEnum):
     Connected = enum.auto()
 
     RequestedLinkParams = enum.auto()

@@ -1,3 +1,5 @@
+from enum import IntEnum, unique
+
 from ..protocol import TLV, Command, Packet, encode_int, encrypt_packet
 
 
@@ -7,12 +9,14 @@ class LocaleConfig:
     class SetLocale:
         id = 1
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             LanguageTag = 1  # IETF BCP 47 language tag, see https://tools.ietf.org/html/rfc5646
             MeasurementSystem = 2
 
 
-class MeasurementSystem:
+@unique
+class MeasurementSystem(IntEnum):
     Metric = 0
     Imperial = 1
 

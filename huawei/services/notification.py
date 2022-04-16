@@ -1,4 +1,4 @@
-import enum
+from enum import IntEnum, unique
 from typing import TypeVar
 
 from ..protocol import TLV, Command, Packet, encode_int, encrypt_packet
@@ -10,7 +10,8 @@ class Notification:
     class Message:
         id = 1
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Id = 1
             Type = 2
             Vibrate = 3
@@ -33,7 +34,8 @@ class Notification:
             TextItem = 141
 
 
-class NotificationType(enum.Enum):
+@unique
+class NotificationType(IntEnum):
     Call = 1
     SMS = 2
     WeChat = 3
@@ -43,7 +45,8 @@ class NotificationType(enum.Enum):
     Generic = 127
 
 
-class TextKind(enum.Enum):
+@unique
+class TextKind(IntEnum):
     Text = 1
     Sender = 2
     Title = 3

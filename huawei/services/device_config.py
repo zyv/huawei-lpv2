@@ -1,6 +1,6 @@
-import enum
 from dataclasses import dataclass
 from datetime import datetime
+from enum import IntEnum, unique
 from logging import getLogger
 from typing import Tuple
 
@@ -32,7 +32,8 @@ class DeviceConfig:
     class LinkParams:
         id = 1
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             ProtocolVersion = 1
             MaxFrameSize = 2
             MaxLinkSize = 3
@@ -43,7 +44,8 @@ class DeviceConfig:
     class SetDateFormat:
         id = 4
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             DateFormat = 2
             TimeFormat = 3
             SetDateFormat = 129
@@ -51,14 +53,16 @@ class DeviceConfig:
     class SetTime:
         id = 5
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Timestamp = 1
             ZoneOffset = 2
 
     class ProductInfo:
         id = 7
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             BTVersion = 1
             ProductType = 2  # int
             HardwareVersion = 3
@@ -75,7 +79,8 @@ class DeviceConfig:
     class Bond:
         id = 14
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             BondRequest = 1
             Status = 2
             RequestCode = 3
@@ -86,7 +91,8 @@ class DeviceConfig:
     class BondParams:
         id = 15
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Status = 1
             StatusInfo = 2
             ClientSerial = 3
@@ -98,38 +104,44 @@ class DeviceConfig:
     class Auth:
         id = 19
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Challenge = 1
             Nonce = 2
 
     class BatteryLevel:
         id = 8
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             GetStatus = 1
 
     class ActivateOnRotate:
         id = 9
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
     class FactoryReset:
         id = 13
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
     class NavigateOnRotate:
         id = 27
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
     class LeftRightWrist:
         id = 26
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
 
@@ -283,13 +295,15 @@ def request_bond(auth_version: AuthVersion, client_serial: str, device_mac: str,
     )
 
 
-class DateFormat(enum.Enum):
+@unique
+class DateFormat(IntEnum):
     YearFirst = 1
     MonthFirst = 2
     DayFirst = 3
 
 
-class TimeFormat(enum.Enum):
+@unique
+class TimeFormat(IntEnum):
     Hours12 = 1
     Hours24 = 2
 
