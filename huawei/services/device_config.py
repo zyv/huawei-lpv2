@@ -193,7 +193,7 @@ def process_link_params(command: Command) -> Tuple[LinkParams, bytes]:
         raise MismatchError("server nonce length", len(server_nonce), NONCE_LENGTH)
 
     logger.info(
-        "Negotiated link parameters:\n\t"
+        "Negotiated link parameters:\n\t%s",
         "\n\t".join(
             (
                 f"Protocol version: {link_params.protocol_version}",
@@ -264,7 +264,7 @@ def process_bond_params(command: Command) -> Tuple[int, int]:
     # TODO: check bond status
 
     logger.info(
-        "Negotiated bond params:\n\t"
+        "Negotiated bond params:\n\t%s",
         "\n\t".join(
             (
                 f"Bond status: {bond_status}",
