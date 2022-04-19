@@ -1,7 +1,7 @@
-import enum
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Callable, List, Optional
+from enum import IntEnum, unique
+from typing import Callable, Optional
 
 from ..protocol import TLV, Command, Packet, check_result, decode_int, encode_int, encrypt_packet, set_status
 
@@ -12,7 +12,8 @@ class Fitness:
     class SetUserInfo:
         id = 2
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Height = 1
             Weight = 2
             Age = 3
@@ -24,7 +25,8 @@ class Fitness:
     class GetTodayTotals:
         id = 3
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Request = 1
             TotalCalories = 2
             MotionType = 4
@@ -40,13 +42,15 @@ class Fitness:
     class TruSleepState:
         id = 22
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
     class HRMonitorState:
         id = 23
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
 
@@ -63,7 +67,8 @@ def request_today_totals() -> Packet:
     )
 
 
-class MotionType(enum.Enum):
+@unique
+class MotionType(IntEnum):
     Walking = 1
     Running = 2
     Climbing = 3
@@ -79,7 +84,7 @@ class ActivityTotals:
     """
 
     type: MotionType
-    calories: int
+    calories: Optional[int] = None
     steps: Optional[int] = None
     distance: Optional[int] = None
     height: Optional[int] = None
@@ -100,8 +105,8 @@ class HeartRate:
 @dataclass
 class TodayTotals:
     calories: int
-    heart_rate: HeartRate
-    activities: List[ActivityTotals]
+    heart_rate: Optional[HeartRate]
+    activities: list[ActivityTotals]
 
 
 @check_result
@@ -113,15 +118,19 @@ def process_today_totals(command: Command) -> TodayTotals:
         return func(item.command[tag].value) if tag in item.command else None
 
     return TodayTotals(
-        calories=(decode_int(response[tags.TotalCalories].value)),
-        heart_rate=HeartRate(
-            time=datetime.fromtimestamp(decode_int(response[tags.HeartRate].value[:-1])),
-            rate=decode_int(response[tags.HeartRate].value[-1:]),
+        calories=decode_int(response[tags.TotalCalories].value),
+        heart_rate=(
+            HeartRate(
+                time=datetime.fromtimestamp(decode_int(response[tags.HeartRate].value[:-1])),
+                rate=decode_int(response[tags.HeartRate].value[-1:]),
+            )
+            if tags.HeartRate in response
+            else None
         ),
         activities=[
             ActivityTotals(
                 type=MotionType(decode_int(tlv.command[tags.MotionType].value)),
-                calories=decode_int(tlv.command[tags.Calories].value),
+                calories=fmap(decode_int, tlv, tags.Calories),
                 steps=fmap(decode_int, tlv, tags.Steps),
                 distance=fmap(decode_int, tlv, tags.Distance),
                 height=fmap(decode_int, tlv, tags.Height),
@@ -133,7 +142,8 @@ def process_today_totals(command: Command) -> TodayTotals:
     )
 
 
-class Sex(enum.Enum):
+@unique
+class Sex(IntEnum):
     Male = 1
     Female = 2
 

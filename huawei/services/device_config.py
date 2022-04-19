@@ -1,17 +1,17 @@
-import enum
 from dataclasses import dataclass
 from datetime import datetime
+from enum import IntEnum, unique
 from logging import getLogger
 from typing import Tuple
 
 from ..protocol import (
-    AUTH_VERSION,
     NONCE_LENGTH,
-    PROTOCOL_VERSION,
     TLV,
+    AuthVersion,
     Command,
     MismatchError,
     Packet,
+    ProtocolVersion,
     check_result,
     create_bonding_key,
     decode_int,
@@ -32,7 +32,8 @@ class DeviceConfig:
     class LinkParams:
         id = 1
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             ProtocolVersion = 1
             MaxFrameSize = 2
             MaxLinkSize = 3
@@ -43,7 +44,8 @@ class DeviceConfig:
     class SetDateFormat:
         id = 4
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             DateFormat = 2
             TimeFormat = 3
             SetDateFormat = 129
@@ -51,14 +53,16 @@ class DeviceConfig:
     class SetTime:
         id = 5
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Timestamp = 1
             ZoneOffset = 2
 
     class ProductInfo:
         id = 7
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             BTVersion = 1
             ProductType = 2  # int
             HardwareVersion = 3
@@ -75,7 +79,8 @@ class DeviceConfig:
     class Bond:
         id = 14
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             BondRequest = 1
             Status = 2
             RequestCode = 3
@@ -86,7 +91,8 @@ class DeviceConfig:
     class BondParams:
         id = 15
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Status = 1
             StatusInfo = 2
             ClientSerial = 3
@@ -98,38 +104,44 @@ class DeviceConfig:
     class Auth:
         id = 19
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             Challenge = 1
             Nonce = 2
 
     class BatteryLevel:
         id = 8
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             GetStatus = 1
 
     class ActivateOnRotate:
         id = 9
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
     class FactoryReset:
         id = 13
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
     class NavigateOnRotate:
         id = 27
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
     class LeftRightWrist:
         id = 26
 
-        class Tags:
+        @unique
+        class Tags(IntEnum):
             SetStatus = 1
 
 
@@ -150,65 +162,78 @@ def request_link_params() -> Packet:
 
 @dataclass
 class LinkParams:
+    protocol_version: ProtocolVersion
     max_frame_size: int
     max_link_size: int
     connection_interval: int  # milliseconds
+    auth_version: AuthVersion
 
 
 @check_result
 def process_link_params(command: Command) -> Tuple[LinkParams, bytes]:
     link_params = LinkParams(
+        protocol_version=ProtocolVersion(decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)),
         max_frame_size=decode_int(command[DeviceConfig.LinkParams.Tags.MaxFrameSize].value),
         max_link_size=decode_int(command[DeviceConfig.LinkParams.Tags.MaxLinkSize].value),
         connection_interval=decode_int(command[DeviceConfig.LinkParams.Tags.ConnectionInterval].value),
+        auth_version=AuthVersion(decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])),
     )
 
-    protocol_version = decode_int(command[DeviceConfig.LinkParams.Tags.ProtocolVersion].value)
-    auth_version = decode_int(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[:2])
     server_nonce = bytes(command[DeviceConfig.LinkParams.Tags.ServerNonce].value[2:18])
 
     # TODO: optional path extend number parsing
 
-    if protocol_version != PROTOCOL_VERSION:
-        raise MismatchError("protocol version", protocol_version, PROTOCOL_VERSION)
+    if link_params.protocol_version != ProtocolVersion.V2:
+        raise MismatchError("protocol version", link_params.protocol_version, tuple(ProtocolVersion))
 
-    if auth_version != AUTH_VERSION:
-        raise MismatchError("authentication scheme version", auth_version, AUTH_VERSION)
+    if link_params.auth_version not in AuthVersion:
+        raise MismatchError("authentication scheme version", link_params.auth_version, tuple(AuthVersion))
 
     if len(server_nonce) != NONCE_LENGTH:
         raise MismatchError("server nonce length", len(server_nonce), NONCE_LENGTH)
 
     logger.info(
-        f"Negotiated link parameters: "
-        f"{link_params.max_frame_size}, "
-        f"{link_params.max_link_size}, "
-        f"{link_params.connection_interval}, "
-        f"{hexlify(server_nonce)}",
+        "Negotiated link parameters:\n\t%s",
+        "\n\t".join(
+            (
+                f"Protocol version: {link_params.protocol_version}",
+                f"Max frame size: {link_params.max_frame_size}",
+                f"Max link size: {link_params.max_link_size}",
+                f"Connection interval: {link_params.connection_interval}",
+                f"Auth version : {link_params.auth_version}",
+                f"Server nonce: {hexlify(server_nonce)}",
+            ),
+        ),
     )
 
     return link_params, server_nonce
 
 
-def request_authentication(client_nonce: bytes, server_nonce: bytes) -> Packet:
+def request_authentication(auth_version: AuthVersion, client_nonce: bytes, server_nonce: bytes) -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.Auth.id,
         command=Command(
             tlvs=[
-                TLV(tag=DeviceConfig.Auth.Tags.Challenge, value=digest_challenge(client_nonce, server_nonce)),
-                TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(AUTH_VERSION) + client_nonce)),
+                TLV(
+                    tag=DeviceConfig.Auth.Tags.Challenge,
+                    value=digest_challenge(auth_version, client_nonce, server_nonce),
+                ),
+                TLV(tag=DeviceConfig.Auth.Tags.Nonce, value=(encode_int(auth_version) + client_nonce)),
             ],
         ),
     )
 
 
 @check_result
-def process_authentication(command: Command, client_nonce: bytes, server_nonce: bytes):
-    expected_answer = digest_response(client_nonce, server_nonce)
+def process_authentication(auth_version: AuthVersion, command: Command, client_nonce: bytes, server_nonce: bytes):
+    expected_answer = digest_response(auth_version, client_nonce, server_nonce)
     actual_answer = command[DeviceConfig.Auth.Tags.Challenge].value
 
     if expected_answer != actual_answer:
         raise MismatchError("challenge answer", actual_answer, expected_answer)
+
+    logger.info("Process authentication:\n\tDone!")
 
 
 def request_bond_params(client_serial: str, client_mac: str) -> Packet:
@@ -239,18 +264,22 @@ def process_bond_params(command: Command) -> Tuple[int, int]:
     # TODO: check bond status
 
     logger.info(
-        f"Negotiated bond params: "
-        f"{bond_status}, "
-        f"{bond_status_info}, "
-        f"{bt_version}, "
-        f"{max_frame_size}, "
-        f"{encryption_counter}",
+        "Negotiated bond params:\n\t%s",
+        "\n\t".join(
+            (
+                f"Bond status: {bond_status}",
+                f"Bond status info: {bond_status_info}",
+                f"BT version: {bt_version}",
+                f"Max frame size: {max_frame_size}",
+                f"Encryption counter: {encryption_counter}",
+            ),
+        ),
     )
 
     return max_frame_size, encryption_counter
 
 
-def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> Packet:
+def request_bond(auth_version: AuthVersion, client_serial: str, device_mac: str, key: bytes, iv: bytes) -> Packet:
     return Packet(
         service_id=DeviceConfig.id,
         command_id=DeviceConfig.Bond.id,
@@ -259,20 +288,22 @@ def request_bond(client_serial: str, device_mac: str, key: bytes, iv: bytes) -> 
                 TLV(tag=DeviceConfig.Bond.Tags.BondRequest),
                 TLV(tag=DeviceConfig.Bond.Tags.RequestCode, value=b"\x00"),
                 TLV(tag=DeviceConfig.Bond.Tags.ClientSerial, value=client_serial.encode()),
-                TLV(tag=DeviceConfig.Bond.Tags.BondingKey, value=create_bonding_key(device_mac, key, iv)),
+                TLV(tag=DeviceConfig.Bond.Tags.BondingKey, value=create_bonding_key(auth_version, device_mac, key, iv)),
                 TLV(tag=DeviceConfig.Bond.Tags.InitVector, value=iv),
             ],
         ),
     )
 
 
-class DateFormat(enum.Enum):
+@unique
+class DateFormat(IntEnum):
     YearFirst = 1
     MonthFirst = 2
     DayFirst = 3
 
 
-class TimeFormat(enum.Enum):
+@unique
+class TimeFormat(IntEnum):
     Hours12 = 1
     Hours24 = 2
 
